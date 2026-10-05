@@ -52,20 +52,21 @@ read.model_dump_json()  # JSON listo para enviar o guardar
 
 | Campo | Tipo en JSON | Obligatorio al crear | Reglas |
 |---|---|---|---|
-| `schema_version` | entero | No (vale `1`) | Solo se acepta `1`. |
+| `schema_version` | entero | No (vale `1`) | Solo se acepta el entero `1`; `true` y `1.0` se rechazan. |
 | `event_id` | texto (UUID) | No (se genera) | Debe ser un UUID versión 7. |
 | `plate` | texto | Sí | Se guarda en mayúsculas y sin espacios ni guiones. Vacía tras normalizar se rechaza. |
 | `raw_text` | texto | Sí | Texto tal como lo entregó el OCR o la cámara, sin cambios. Vacío o solo espacios se rechaza. |
 | `plate_kind` | `car`, `motorcycle` o `unknown` | No (se calcula) | Se deriva siempre de `plate`. Si se envía y no coincide, se rechaza. |
-| `confidence` | número | Sí | Entre 0 y 1, ambos incluidos. `NaN` se rechaza. |
-| `captured_at` | texto (fecha ISO 8601) | Sí | Debe traer zona horaria; se guarda convertido a UTC. |
-| `lane_id` | texto | Sí | No puede estar vacío. |
+| `confidence` | número | Sí | Entre 0 y 1, ambos incluidos. Se aceptan `0` y `1` enteros; se rechazan `NaN`, `true`/`false` y números en texto como `"0.5"`. |
+| `captured_at` | texto (fecha ISO 8601) | Sí | Debe traer zona horaria; se guarda convertido a UTC. Se rechazan marcas de tiempo Unix como `1700000000`, también si llegan como texto. |
+| `lane_id` | texto | Sí | Vacío o solo espacios se rechaza. |
 | `source` | `pipeline` o `lpr_camera` | Sí | Quién produjo la lectura. |
-| `photo` | texto o `null` | No (vale `null`) | Clave de la foto en el almacenamiento (por ejemplo `2026/10/04/x.jpg`), no la imagen. Se rechazan bytes y texto vacío. |
+| `photo` | texto o `null` | No (vale `null`) | Clave de la foto en el almacenamiento (por ejemplo `2026/10/04/x.jpg`), no la imagen. Vacío o solo espacios se rechaza. |
 
 ### Reglas generales
 
-- **Inmutable:** una lectura no se puede modificar después de creada (`read.plate = "X"` lanza `ValidationError`). Si hace falta otra, se crea otra.
+- **Inmutable:** una lectura no se puede modificar después de creada (`read.plate = "X"` lanza `ValidationError`). Si hace falta otra, se crea otra con `PlateRead.model_validate({**read.model_dump(exclude={"plate_kind"}), "plate": "ABC12D"})`; se excluye `plate_kind` para que se vuelva a calcular, porque el anterior contradiría la placa nueva. No uses `read.model_copy(update=...)`: Pydantic no valida los campos que cambia, así que podría quedar, por ejemplo, una placa de moto con `plate_kind` de carro.
+- **Tipos estrictos:** los campos de texto (`plate`, `raw_text`, `lane_id`, `photo`) no aceptan bytes, y los números no se aceptan como texto ni como booleanos. Pydantic, por defecto, convierte esos valores en silencio; aquí se rechazan para que un error del productor no pase inadvertido.
 - **Sin campos extra:** un campo que no esté en la tabla (por ejemplo `camera_id`) se rechaza. Así un error de escritura no pasa inadvertido.
 - **Tipo de placa:** carro es `AAA999` (tres letras y tres dígitos) y moto es `AAA99A` (tres letras, dos dígitos y una letra). Cualquier otro formato queda como `unknown`, pero la lectura se acepta igual: puede ser una placa diplomática, antigua o un error del OCR que conviene registrar. Solo cuentan los dígitos ASCII `0` a `9`.
 - **UUIDv7 en `event_id`:** un UUID es un identificador único; la versión 7 empieza con la fecha y hora, así que los eventos quedan ordenados por momento de creación. Sirve para no procesar dos veces el mismo evento si se reenvía.
@@ -74,6 +75,8 @@ read.model_dump_json()  # JSON listo para enviar o guardar
 ### JSON Schema
 
 [`schemas/plate_read.v1.schema.json`](schemas/plate_read.v1.schema.json) describe el contrato en un formato estándar que entienden otros lenguajes (por ejemplo, la consola web en TypeScript). Describe el JSON que emite `model_dump_json()`, por eso todos los campos aparecen como requeridos.
+
+El esquema describe la estructura, pero es menos exigente que el modelo. Hay reglas que solo aplica `PlateRead`: que `event_id` sea UUID versión 7, que `captured_at` traiga zona horaria (y no sea una marca Unix), que `plate`, `raw_text`, `lane_id` y `photo` no queden vacíos o en blanco, y que `plate_kind` coincida con `plate`. Un JSON que cumple el esquema todavía puede ser rechazado por el modelo; la validación definitiva es `PlateRead.model_validate_json(...)`.
 
 Una prueba compara el archivo guardado con el que genera el modelo. Si cambias el modelo, esa prueba falla hasta que regeneres el archivo:
 

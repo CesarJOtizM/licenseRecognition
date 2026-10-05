@@ -1,6 +1,9 @@
+import json
 import math
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -36,6 +39,27 @@ def test_una_version_del_esquema_distinta_de_1_se_rechaza(payload: dict[str, Any
         PlateRead.model_validate({**payload, "schema_version": 2})
 
 
+@pytest.mark.parametrize("schema_version", [True, 1.0, "1"])
+def test_una_version_del_esquema_que_no_es_entero_se_rechaza(
+    payload: dict[str, Any], schema_version: object
+) -> None:
+    with pytest.raises(ValidationError, match="schema_version"):
+        PlateRead.model_validate({**payload, "schema_version": schema_version})
+
+
+@pytest.mark.parametrize("schema_version", [True, 1.0])
+def test_una_version_del_esquema_que_no_es_entero_se_rechaza_en_json(
+    payload: dict[str, Any], schema_version: object
+) -> None:
+    with pytest.raises(ValidationError, match="schema_version"):
+        PlateRead.model_validate_json(json.dumps({**payload, "schema_version": schema_version}))
+
+
+def test_una_version_del_esquema_entera_se_acepta_en_json(payload: dict[str, Any]) -> None:
+    read = PlateRead.model_validate_json(json.dumps({**payload, "schema_version": 1}))
+    assert read.schema_version == 1
+
+
 @pytest.mark.parametrize(
     ("plate", "expected"),
     [(" abc-123 ", "ABC123"), ("abc 12d", "ABC12D")],
@@ -59,6 +83,15 @@ def test_el_texto_crudo_se_guarda_tal_cual(payload: dict[str, Any]) -> None:
 def test_un_texto_crudo_vacio_se_rechaza(payload: dict[str, Any], raw_text: str) -> None:
     with pytest.raises(ValidationError, match="raw_text"):
         PlateRead.model_validate({**payload, "raw_text": raw_text})
+
+
+@pytest.mark.parametrize("field", ["plate", "raw_text", "lane_id"])
+@pytest.mark.parametrize("value", [b"ABC12D", bytearray(b"ABC12D")])
+def test_un_campo_de_texto_en_bytes_se_rechaza(
+    payload: dict[str, Any], field: str, value: bytes | bytearray
+) -> None:
+    with pytest.raises(ValidationError, match=field):
+        PlateRead.model_validate({**payload, field: value})
 
 
 @pytest.mark.parametrize(
@@ -88,6 +121,20 @@ def test_un_tipo_de_placa_que_contradice_la_placa_se_rechaza(payload: dict[str, 
         PlateRead.model_validate({**payload, "plate_kind": "motorcycle"})
 
 
+def test_el_tipo_se_deriva_aunque_la_entrada_no_sea_un_dict(payload: dict[str, Any]) -> None:
+    read = PlateRead.model_validate(MappingProxyType({**payload, "plate": "abc-12d"}))
+    assert read.plate_kind is PlateKind.MOTORCYCLE
+
+
+def test_un_tipo_contradictorio_se_rechaza_aunque_la_entrada_no_sea_un_dict(
+    payload: dict[str, Any],
+) -> None:
+    with pytest.raises(ValidationError, match="plate_kind"):
+        PlateRead.model_validate(
+            MappingProxyType({**payload, "plate": "ABC12D", "plate_kind": "car"})
+        )
+
+
 def test_derivar_el_tipo_no_modifica_el_diccionario_de_entrada(payload: dict[str, Any]) -> None:
     original = dict(payload)
     PlateRead.model_validate(payload)
@@ -112,6 +159,22 @@ def test_la_confianza_fuera_de_rango_o_nan_se_rechaza(
         PlateRead.model_validate({**payload, "confidence": confidence})
 
 
+@pytest.mark.parametrize("confidence", [True, False, "0.5"])
+def test_una_confianza_booleana_o_en_texto_se_rechaza(
+    payload: dict[str, Any], confidence: object
+) -> None:
+    with pytest.raises(ValidationError, match="confidence"):
+        PlateRead.model_validate({**payload, "confidence": confidence})
+
+
+@pytest.mark.parametrize("confidence", [True, "0.5"])
+def test_una_confianza_booleana_o_en_texto_se_rechaza_en_json(
+    payload: dict[str, Any], confidence: object
+) -> None:
+    with pytest.raises(ValidationError, match="confidence"):
+        PlateRead.model_validate_json(json.dumps({**payload, "confidence": confidence}))
+
+
 def test_una_fecha_sin_zona_horaria_se_rechaza(payload: dict[str, Any]) -> None:
     with pytest.raises(ValidationError, match="captured_at"):
         PlateRead.model_validate({**payload, "captured_at": "2026-10-04T08:00:00"})
@@ -128,6 +191,25 @@ def test_una_fecha_en_utc_se_guarda_igual(payload: dict[str, Any]) -> None:
     read = PlateRead.model_validate({**payload, "captured_at": captured_at})
     assert read.captured_at == captured_at
     assert read.captured_at.tzinfo is UTC
+
+
+@pytest.mark.parametrize(
+    "captured_at",
+    [1700000000, 1700000000.5, "1700000000", Decimal(1700000000), b"2026-10-04T13:00:00Z"],
+)
+def test_una_fecha_como_numero_o_bytes_se_rechaza(
+    payload: dict[str, Any], captured_at: object
+) -> None:
+    with pytest.raises(ValidationError, match="captured_at"):
+        PlateRead.model_validate({**payload, "captured_at": captured_at})
+
+
+@pytest.mark.parametrize("captured_at", [1700000000, "1700000000"])
+def test_una_fecha_como_numero_se_rechaza_en_json(
+    payload: dict[str, Any], captured_at: object
+) -> None:
+    with pytest.raises(ValidationError, match="captured_at"):
+        PlateRead.model_validate_json(json.dumps({**payload, "captured_at": captured_at}))
 
 
 def test_el_event_id_por_defecto_es_un_uuid7_nuevo(payload: dict[str, Any]) -> None:
@@ -173,15 +255,16 @@ def test_la_foto_se_guarda_como_clave_de_texto(payload: dict[str, Any]) -> None:
     assert read.photo == "2026/10/04/x.jpg"
 
 
-@pytest.mark.parametrize("photo", [b"\xff\xd8\xff", b"x.jpg", ""])
+@pytest.mark.parametrize("photo", [b"\xff\xd8\xff", b"x.jpg", "", "   "])
 def test_una_foto_en_bytes_o_vacia_se_rechaza(payload: dict[str, Any], photo: bytes | str) -> None:
     with pytest.raises(ValidationError, match="photo"):
         PlateRead.model_validate({**payload, "photo": photo})
 
 
-def test_un_carril_vacio_se_rechaza(payload: dict[str, Any]) -> None:
+@pytest.mark.parametrize("lane_id", ["", "   "])
+def test_un_carril_vacio_se_rechaza(payload: dict[str, Any], lane_id: str) -> None:
     with pytest.raises(ValidationError, match="lane_id"):
-        PlateRead.model_validate({**payload, "lane_id": ""})
+        PlateRead.model_validate({**payload, "lane_id": lane_id})
 
 
 def test_la_lectura_no_se_puede_modificar(payload: dict[str, Any]) -> None:
