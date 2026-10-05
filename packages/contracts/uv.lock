@@ -188,31 +188,6 @@ wheels = [
 ]
 
 [[package]]
-name = "edge-agent"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "lr-contracts" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "lr-contracts", editable = "../../packages/contracts" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.18" },
-    { name = "pytest", specifier = ">=8.4" },
-    { name = "pytest-cov", specifier = ">=7.0" },
-]
-
-[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -325,10 +300,17 @@ wheels = [
 [[package]]
 name = "lr-contracts"
 version = "0.1.0"
-source = { editable = "../../packages/contracts" }
+source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
     { name = "uuid-utils" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
 ]
 
 [package.metadata]

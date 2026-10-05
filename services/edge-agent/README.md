@@ -6,7 +6,15 @@ Programa que corre en el mini-PC de la portería. Captura video (webcam, cámara
 
 ## Estado
 
-Solo el esqueleto del paquete y su configuración de calidad. En la fase 0, paso 2, se define el contrato `PlateRead`. El pipeline de visión llega en la fase 1.
+Solo el esqueleto del paquete, su configuración de calidad y la dependencia del paquete de contratos. En la fase 0, paso 2, se define el contrato `PlateRead`. El pipeline de visión llega en la fase 1.
+
+## Dependencia de `lr-contracts`
+
+Los eventos que produce este servicio (como `PlateRead`) se definen en [`packages/contracts`](../../packages/contracts/), no aquí. edge-agent lo declara en `pyproject.toml` como dependencia de ruta editable (`[tool.uv.sources]`), así que se importa como cualquier paquete instalado: `import lr_contracts`. Ver el [ADR 0004](../../docs/decisiones/0004-paquete-de-contratos-compartido.md).
+
+- Un cambio en el código de `packages/contracts` se ve aquí sin reinstalar nada.
+- Un cambio en las dependencias o la versión de `packages/contracts` obliga a correr `uv lock --directory services/edge-agent`; si no, `uv sync --locked` falla.
+- `tests/test_contracts_dependency.py` comprueba que el paquete está instalado y viene de `packages/contracts`.
 
 ## Estructura
 

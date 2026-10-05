@@ -12,6 +12,7 @@ Sistema para la portería de un conjunto residencial: lee las placas de los veh�
 | [`apps/web/`](apps/web/) | Interfaz web en Next.js (guarda, administración y residente) | 3 |
 | [`services/api/`](services/api/) | Backend FastAPI con PostgreSQL | 0 |
 | [`services/edge-agent/`](services/edge-agent/) | Equipo local de la portería: captura, lectura de placas, decisión y puerta | 0 (contrato) y 1 |
+| [`packages/`](packages/) | Paquetes compartidos entre servicios; por ahora `contracts` con los eventos como `PlateRead` | 0 |
 | [`ml/`](ml/) | Datasets, entrenamiento y evaluación de YOLO y OCR | 1 |
 | [`infra/`](infra/) | docker-compose para levantar todo en local | 0 |
 | [`docs/`](docs/) | Plan, decisiones y privacidad | — |

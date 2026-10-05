@@ -17,6 +17,9 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Instalar dependencias de contracts
+        run: uv sync --locked --directory packages/contracts
+
       - name: Instalar dependencias de edge-agent
         run: uv sync --locked --directory services/edge-agent
 
@@ -25,3 +28,6 @@ jobs:
 
       - name: Pruebas de edge-agent
         run: uv run --directory services/edge-agent pytest
+
+      - name: Pruebas de contracts
+        run: uv run --directory packages/contracts pytest

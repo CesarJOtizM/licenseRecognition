@@ -99,6 +99,7 @@ licenseRecognition/
 ├── apps/web/              # Next.js
 ├── services/api/          # FastAPI + PostgreSQL (SQLAlchemy + Alembic)
 ├── services/edge-agent/   # captura, ANPR, adaptadores LPR, decisión, puerta, sincronización
+├── packages/contracts/    # contratos compartidos entre servicios, como PlateRead (ADR 0004)
 ├── ml/                    # datasets, entrenamiento y evaluación de YOLO y OCR
 ├── infra/                 # docker-compose (Postgres, API, web, edge; MinIO opcional para probar la subida a la nube)
 └── docs/                  # arquitectura, decisiones (ADRs), privacidad
