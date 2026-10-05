@@ -1,0 +1,43 @@
+# Herramientas locales del agente
+.atl/
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.pnpm-store/
+
+# Datos generados en tiempo de ejecución (fotos de eventos, SQLite local)
+data/
+*.sqlite
+*.sqlite3
+*.db
+
+# ML: datasets, pesos y resultados de entrenamiento
+ml/datasets/
+ml/runs/
+*.pt
+*.onnx
+
+# Editor y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,30 @@
+---
+description: Proyecto de aprendizaje; explicar siempre lo que se hace y por qué
+alwaysApply: true
+---
+
+# Proyecto de aprendizaje: explicar todo
+
+Este proyecto (portería con reconocimiento de placas) es para aprender. El plan está en `docs/plan-proyecto.md`.
+
+## Antes de cada cambio
+
+- Explicar qué se va a hacer, por qué y qué alternativas había.
+- Si aparece un concepto nuevo (YOLO, OCR, RTSP, outbox, WebSocket, migración, etc.), explicarlo en lenguaje simple con un ejemplo del proyecto.
+
+## Después de cada cambio
+
+- Explicar qué se hizo y cómo funciona, archivo por archivo cuando sea útil.
+- Indicar cómo ejecutarlo y cómo probarlo (comandos concretos).
+- Señalar qué queda pendiente o qué puede fallar.
+
+## Documentación
+
+- Las decisiones de arquitectura van en `docs/decisiones/NNNN-titulo.md` (contexto, opciones, decisión, consecuencias).
+- Cada servicio tiene un `README.md` con qué hace, cómo se ejecuta y cómo se prueba.
+- Si una decisión cambia el plan, actualizar `docs/plan-proyecto.md`.
+
+## Ejemplo
+
+En vez de solo "Agregué `WebcamSource`", explicar:
+"Agregué `WebcamSource`, que abre la webcam con `cv2.VideoCapture(0)`. El `0` es el índice del dispositivo; si tienes varias cámaras, prueba con `1`. Implementa la interfaz `FrameSource`, así que el pipeline no sabe si los cuadros vienen de la webcam o de una cámara IP. Para probarlo: `python -m edge_agent.capture --source webcam`."
