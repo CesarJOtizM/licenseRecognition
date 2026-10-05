@@ -15,10 +15,12 @@ Restricciones que ya existen:
 
 ## Opciones
 
-1. **Copiar el modelo en cada servicio:** no hay dependencias nuevas, pero cada cambio se hace dos veces y nada avisa si las copias se separan.
-2. **Workspace de uv en la raíz (un solo `uv.lock` para todo):** uv resuelve todos los proyectos juntos. Contradice el ADR 0002 y obliga a que la API y el equipo local usen exactamente las mismas versiones de todo, aunque se desplieguen por separado.
-3. **Publicar el paquete en un índice (PyPI privado) o instalarlo desde una URL de git:** es como se haría entre varios repositorios, pero exige publicar una versión por cada cambio. Para una persona en un monorepo es trabajo sin beneficio.
-4. **Paquete propio en `packages/contracts`, instalado como dependencia de ruta editable:** un proyecto de Python independiente (con su `pyproject.toml`, su `uv.lock`, sus pruebas y su mypy) que cada servicio declara como dependencia.
+Se evaluaron cuatro alternativas; solo la cuarta se adoptó.
+
+1. **Copiar el modelo en cada servicio (descartada):** no hay dependencias nuevas, pero cada cambio se hace dos veces y nada avisa si las copias se separan. Es justo el problema que este ADR quiere evitar.
+2. **Workspace de uv en la raíz, con un solo `uv.lock` para todo (descartada):** uv resuelve todos los proyectos juntos. Contradice el ADR 0002 y obliga a que la API y el equipo local usen exactamente las mismas versiones de todo, aunque se desplieguen por separado.
+3. **Publicar el paquete en un índice (PyPI privado) o instalarlo desde una URL de git (descartada):** es como se haría entre varios repositorios, pero exige publicar una versión por cada cambio. Para una persona en un monorepo es trabajo sin beneficio.
+4. **Paquete propio en `packages/contracts`, instalado como dependencia de ruta editable (elegida):** un proyecto de Python independiente (con su `pyproject.toml`, su `uv.lock`, sus pruebas y su mypy) que cada servicio declara como dependencia.
 
 ## Decisión
 
