@@ -8,3 +8,4 @@ Cada archivo se llama `NNNN-titulo.md` y sigue la [plantilla](0000-plantilla.md)
 |---|---|---|
 | [0001](0001-monorepo.md) | Un solo repositorio (monorepo) para todo el sistema | Aceptado |
 | [0002](0002-herramientas-uv-pnpm.md) | uv para Python y pnpm para Node | Aceptado |
+| [0003](0003-calidad-de-codigo.md) | Ruff, mypy estricto, pytest, pre-commit y CI | Aceptado |

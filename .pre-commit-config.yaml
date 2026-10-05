@@ -1,0 +1,63 @@
+# Chequeos que corren automáticamente con git.
+# Instalar una vez por clon:  uvx pre-commit install
+# Correr todo a mano:         uvx pre-commit run --all-files
+
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.(ps1|bat)$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: quitar-coautor-ia
+        name: quitar trailer de coautor IA
+        entry: python scripts/quitar_coautor_ia.py
+        language: python
+        stages: [commit-msg]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  # Hooks locales: usan el entorno de cada servicio (uv) porque mypy y pytest
+  # necesitan las dependencias del servicio para funcionar.
+  - repo: local
+    hooks:
+      - id: mypy-edge-agent
+        name: mypy (edge-agent)
+        entry: uv run --directory services/edge-agent mypy
+        language: system
+        files: ^services/edge-agent/
+        types: [python]
+        pass_filenames: false
+
+      - id: pytest-edge-agent
+        name: pytest (edge-agent)
+        entry: uv run --directory services/edge-agent pytest
+        language: system
+        files: ^services/edge-agent/
+        pass_filenames: false
+        stages: [pre-push]

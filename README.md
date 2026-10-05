@@ -25,6 +25,25 @@ Sistema para la portería de un conjunto residencial: lee las placas de los veh�
 | Node 22 o superior y pnpm | Interfaz web | `node --version`, `pnpm --version` |
 | Docker Desktop | PostgreSQL y servicios en contenedores | `docker compose version` |
 
+## Calidad de código
+
+Ver el [ADR 0003](docs/decisiones/0003-calidad-de-codigo.md). Después de clonar, instala los hooks de git una sola vez:
+
+```powershell
+uvx pre-commit install
+```
+
+Desde ese momento, cada `git commit` revisa formato, lint y tipos; el mensaje del commit debe seguir Conventional Commits (`feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`); y cada `git push` corre las pruebas.
+
+| Qué | Comando |
+|---|---|
+| Todos los chequeos sobre todo el repositorio | `uvx pre-commit run --all-files` |
+| Solo formatear y corregir lint | `uvx pre-commit run ruff-format --all-files` y `uvx pre-commit run ruff-check --all-files` |
+| Pruebas de un servicio | `uv run --directory services/edge-agent pytest` |
+| Tipos de un servicio | `uv run --directory services/edge-agent mypy` |
+
+En Cursor o VS Code conviene instalar la extensión de Ruff para ver los errores mientras escribes.
+
 ## Estado
 
 Fase 0 en curso. Ver el avance en la sección "Fases" del plan.

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  calidad:
+    name: Lint, tipos y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias de edge-agent
+        run: uv sync --locked --directory services/edge-agent
+
+      - name: Chequeos de pre-commit (formato, lint y tipos)
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+      - name: Pruebas de edge-agent
+        run: uv run --directory services/edge-agent pytest

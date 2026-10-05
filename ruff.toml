@@ -1,0 +1,30 @@
+# Configuración de Ruff compartida por todos los servicios de Python.
+# Ruff busca el archivo de configuración más cercano subiendo carpetas,
+# así que los servicios la heredan mientras no definan [tool.ruff] propio.
+
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = [
+  "E", "W",  # pycodestyle: estilo básico
+  "F",       # pyflakes: imports sin usar, variables no definidas
+  "I",       # isort: orden de los imports
+  "N",       # pep8-naming: nombres de clases, funciones y variables
+  "UP",      # pyupgrade: sintaxis moderna de Python
+  "B",       # flake8-bugbear: errores comunes
+  "A",       # no sobrescribir nombres de Python como `id` o `type`
+  "C4",      # comprehensions más simples
+  "SIM",     # simplificaciones de código
+  "PT",      # buenas prácticas de pytest
+  "S",       # bandit: problemas de seguridad
+  "DTZ",     # fechas sin zona horaria
+  "RUF",     # reglas propias de Ruff
+]
+
+[lint.per-file-ignores]
+# En las pruebas se usa `assert`, que bandit marca como inseguro en código normal.
+"**/tests/**" = ["S101"]
+
+[format]
+quote-style = "double"
