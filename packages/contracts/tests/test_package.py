@@ -24,3 +24,7 @@ def test_el_paquete_exporta_el_contrato_desde_la_raiz() -> None:
     ]
     assert lr_contracts.PlateRead is plate_read.PlateRead
     assert lr_contracts.classify_plate("ABC123") is lr_contracts.PlateKind.CAR
+
+
+def test_roto_a_proposito() -> None:
+    assert lr_contracts.__version__ == "9.9.9"
