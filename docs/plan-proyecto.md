@@ -120,7 +120,7 @@ El objetivo es entender cada pieza, no solo que funcione. Por eso:
 
 1. **Fase 0, base (alrededor de 1 semana):** monorepo, docker-compose, esquema de la base de datos, autenticación y roles, y el contrato `PlateRead`. Se hace en pasos pequeños, cada uno con su commit:
    - [x] Paso 1: esqueleto del monorepo, git y convenciones (ADR [0001](decisiones/0001-monorepo.md) y [0002](decisiones/0002-herramientas-uv-pnpm.md)).
-   - [ ] Paso 2: contrato `PlateRead` con sus pruebas.
+   - [x] Paso 2: contrato `PlateRead` con sus pruebas.
    - [ ] Paso 3: docker-compose con PostgreSQL (requiere Docker Desktop).
    - [ ] Paso 4: API FastAPI con el esquema de la base de datos (SQLAlchemy y Alembic).
    - [ ] Paso 5: autenticación y roles (admin, guarda y residente).

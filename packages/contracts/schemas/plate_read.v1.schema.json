@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "PlateKind": {
+      "enum": [
+        "car",
+        "motorcycle",
+        "unknown"
+      ],
+      "title": "PlateKind",
+      "type": "string"
+    },
+    "Source": {
+      "enum": [
+        "pipeline",
+        "lpr_camera"
+      ],
+      "title": "Source",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "event_id": {
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "lane_id": {
+      "minLength": 1,
+      "title": "Lane Id",
+      "type": "string"
+    },
+    "photo": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Photo"
+    },
+    "plate": {
+      "title": "Plate",
+      "type": "string"
+    },
+    "plate_kind": {
+      "$ref": "#/$defs/PlateKind",
+      "default": "unknown"
+    },
+    "raw_text": {
+      "title": "Raw Text",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "plate",
+    "raw_text",
+    "plate_kind",
+    "confidence",
+    "captured_at",
+    "lane_id",
+    "source",
+    "photo"
+  ],
+  "title": "PlateRead",
+  "type": "object"
+}

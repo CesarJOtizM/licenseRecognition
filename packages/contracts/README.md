@@ -6,7 +6,7 @@ Ver la decisión en el [ADR 0004](../../docs/decisiones/0004-paquete-de-contrato
 
 ## Estado
 
-Solo el esqueleto del paquete, su configuración de calidad y la conexión con edge-agent. El modelo `PlateRead` llega en el siguiente paso.
+Contiene la versión 1 del contrato `PlateRead` y su JSON Schema publicado.
 
 ## Estructura
 
@@ -14,9 +14,74 @@ Solo el esqueleto del paquete, su configuración de calidad y la conexión con e
 packages/contracts/
 ├── pyproject.toml        # dependencias (pydantic, uuid-utils) y configuración de pytest, coverage y mypy
 ├── uv.lock               # versiones exactas (se sube a git)
-├── src/lr_contracts/     # código del paquete; py.typed indica a mypy que el paquete trae tipos
+├── schemas/              # JSON Schema generado del contrato (se sube a git)
+├── src/lr_contracts/
+│   ├── plates.py         # normalize_plate, classify_plate y PlateKind
+│   ├── plate_read.py     # modelo PlateRead, Source y new_event_id
+│   ├── schema.py         # genera el JSON Schema
+│   └── py.typed          # indica a mypy que el paquete trae tipos
 └── tests/                # pruebas con pytest
 ```
+
+## Contrato `PlateRead` (versión 1)
+
+Un `PlateRead` es una lectura de placa: "en el carril `entrada-1`, a tal hora, se leyó `ABC123` con 93 % de confianza". Lo produce el pipeline de reconocimiento (o una cámara LPR que ya trae su propio reconocimiento) y lo consumen el motor de decisión, la bitácora y la API.
+
+Es un modelo de Pydantic v2: al crearlo, Pydantic valida y convierte cada campo; si algo no cumple las reglas, lanza `ValidationError` y no se crea el objeto.
+
+```python
+from lr_contracts import PlateRead
+
+read = PlateRead.model_validate(
+    {
+        "plate": "abc-123",
+        "raw_text": "ABC-123",
+        "confidence": 0.93,
+        "captured_at": "2026-10-04T08:00:00-05:00",
+        "lane_id": "entrada-1",
+        "source": "pipeline",
+    }
+)
+read.plate  # "ABC123"
+read.plate_kind  # PlateKind.CAR
+read.captured_at  # 2026-10-04 13:00:00+00:00 (mismo instante, en UTC)
+read.model_dump_json()  # JSON listo para enviar o guardar
+```
+
+### Campos
+
+| Campo | Tipo en JSON | Obligatorio al crear | Reglas |
+|---|---|---|---|
+| `schema_version` | entero | No (vale `1`) | Solo se acepta `1`. |
+| `event_id` | texto (UUID) | No (se genera) | Debe ser un UUID versión 7. |
+| `plate` | texto | Sí | Se guarda en mayúsculas y sin espacios ni guiones. Vacía tras normalizar se rechaza. |
+| `raw_text` | texto | Sí | Texto tal como lo entregó el OCR o la cámara, sin cambios. Vacío o solo espacios se rechaza. |
+| `plate_kind` | `car`, `motorcycle` o `unknown` | No (se calcula) | Se deriva siempre de `plate`. Si se envía y no coincide, se rechaza. |
+| `confidence` | número | Sí | Entre 0 y 1, ambos incluidos. `NaN` se rechaza. |
+| `captured_at` | texto (fecha ISO 8601) | Sí | Debe traer zona horaria; se guarda convertido a UTC. |
+| `lane_id` | texto | Sí | No puede estar vacío. |
+| `source` | `pipeline` o `lpr_camera` | Sí | Quién produjo la lectura. |
+| `photo` | texto o `null` | No (vale `null`) | Clave de la foto en el almacenamiento (por ejemplo `2026/10/04/x.jpg`), no la imagen. Se rechazan bytes y texto vacío. |
+
+### Reglas generales
+
+- **Inmutable:** una lectura no se puede modificar después de creada (`read.plate = "X"` lanza `ValidationError`). Si hace falta otra, se crea otra.
+- **Sin campos extra:** un campo que no esté en la tabla (por ejemplo `camera_id`) se rechaza. Así un error de escritura no pasa inadvertido.
+- **Tipo de placa:** carro es `AAA999` (tres letras y tres dígitos) y moto es `AAA99A` (tres letras, dos dígitos y una letra). Cualquier otro formato queda como `unknown`, pero la lectura se acepta igual: puede ser una placa diplomática, antigua o un error del OCR que conviene registrar. Solo cuentan los dígitos ASCII `0` a `9`.
+- **UUIDv7 en `event_id`:** un UUID es un identificador único; la versión 7 empieza con la fecha y hora, así que los eventos quedan ordenados por momento de creación. Sirve para no procesar dos veces el mismo evento si se reenvía.
+- **Ida y vuelta por JSON:** `PlateRead.model_validate_json(read.model_dump_json())` devuelve una lectura igual a la original.
+
+### JSON Schema
+
+[`schemas/plate_read.v1.schema.json`](schemas/plate_read.v1.schema.json) describe el contrato en un formato estándar que entienden otros lenguajes (por ejemplo, la consola web en TypeScript). Describe el JSON que emite `model_dump_json()`, por eso todos los campos aparecen como requeridos.
+
+Una prueba compara el archivo guardado con el que genera el modelo. Si cambias el modelo, esa prueba falla hasta que regeneres el archivo:
+
+```powershell
+uv run --directory packages/contracts python -m lr_contracts.schema schemas/plate_read.v1.schema.json
+```
+
+Revisa el diff del esquema antes de hacer commit: un cambio ahí es un cambio en el contrato. Si quita o cambia un campo existente, rompe a los consumidores y corresponde una versión nueva (`schema_version` 2 y un archivo `plate_read.v2.schema.json`). Actualizar Pydantic también puede cambiar el archivo generado; en ese caso basta con regenerarlo y revisar el diff.
 
 El nombre de distribución es `lr-contracts` (el que aparece en `pyproject.toml` y en `uv.lock`) y el de importación es `lr_contracts` (el que se escribe en `import`).
 
@@ -36,7 +101,7 @@ Después: `uv lock --directory services/<servicio>` y, en el código, `import lr
 
 ## Cómo se ejecuta
 
-Es una biblioteca: no tiene nada que ejecutar por sí sola.
+Es una biblioteca. Lo único que se ejecuta es el generador del JSON Schema descrito arriba.
 
 ## Cómo se prueba
 
