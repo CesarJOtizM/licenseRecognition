@@ -1,0 +1,44 @@
+# Infraestructura local de la porteria. Ejecutar desde la raiz del repo:
+#   docker compose -f infra/compose.yaml up -d --wait
+# Todo tiene valor por defecto; para cambiarlo copia infra/.env.example a infra/.env.
+name: porteria
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-porteria}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-porteria}
+      POSTGRES_DB: ${POSTGRES_DB:-porteria}
+      # Locale "builtin" (PG17+): el orden del texto no cambia si se actualiza glibc en la imagen.
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale-provider=builtin --builtin-locale=C.UTF-8
+      TZ: UTC
+    ports:
+      # Solo 127.0.0.1: la base no queda expuesta a la red local.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18 guarda los datos en /var/lib/postgresql/18/docker: se monta la carpeta padre.
+      - postgres-data:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1 (TCP): por socket, pg_isready responde antes de que terminen los scripts de init.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  adminer:
+    image: adminer:6
+    profiles: [tools]
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "127.0.0.1:${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
