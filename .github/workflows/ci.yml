@@ -31,3 +31,21 @@ jobs:
 
       - name: Pruebas de contracts
         run: uv run --directory packages/contracts pytest
+
+  infra:
+    name: Infraestructura local (Docker Compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prueba de humo de PostgreSQL
+        run: ./infra/scripts/smoke.sh
+
+      - name: Logs de los contenedores (solo si fallo)
+        if: failure()
+        run: docker compose -f infra/compose.yaml --profile tools logs --no-color
+
+      - name: Apagar y borrar volumenes
+        if: always()
+        run: docker compose -f infra/compose.yaml --profile tools down -v
