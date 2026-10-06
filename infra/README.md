@@ -46,11 +46,13 @@ Desde dentro del contenedor, sin instalar nada:
 docker compose -f infra/compose.yaml exec postgres psql -U porteria -d porteria
 ```
 
-Desde tu máquina (por ejemplo con `psql` o DBeaver): host `localhost`, puerto `5432`, usuario `porteria`, contraseña `porteria`, base `porteria`. La API usará esta URL en el paso 4:
+Desde tu máquina (por ejemplo con `psql` o DBeaver): host `127.0.0.1`, puerto `5432`, usuario `porteria`, contraseña `porteria`, base `porteria`. Usa `127.0.0.1` y no `localhost`: el puerto solo escucha en IPv4, y algunos clientes resuelven `localhost` primero como `::1` (IPv6). La API usará esta URL en el paso 4:
 
 ```text
-DATABASE_URL=postgresql+psycopg://porteria:porteria@localhost:5432/porteria
+DATABASE_URL=postgresql+psycopg://porteria:porteria@127.0.0.1:5432/porteria
 ```
+
+Si cambias `POSTGRES_PORT`, cambia también el puerto de esa URL.
 
 ## Adminer
 
@@ -58,7 +60,7 @@ DATABASE_URL=postgresql+psycopg://porteria:porteria@localhost:5432/porteria
 docker compose -f infra/compose.yaml --profile tools up -d --wait
 ```
 
-Abre <http://127.0.0.1:8080>, elige "PostgreSQL" y usa servidor `postgres`, usuario `porteria`, contraseña `porteria`. Para apagarlo: `docker compose -f infra/compose.yaml --profile tools stop adminer`.
+Abre <http://127.0.0.1:8080>, elige "PostgreSQL" y usa servidor `postgres`, usuario `porteria`, contraseña `porteria` y base de datos `porteria` (o `porteria_test`). El servidor es `postgres` y no `127.0.0.1` porque Adminer corre en su propio contenedor y llega a PostgreSQL por la red interna de compose, donde cada servicio se llama por su nombre. Para apagarlo: `docker compose -f infra/compose.yaml --profile tools stop adminer`.
 
 ## Cómo probar
 
@@ -66,6 +68,12 @@ Desde Git Bash, en la raíz del repositorio:
 
 ```bash
 bash infra/scripts/smoke.sh
+```
+
+Desde PowerShell, llama al bash de Git de forma explícita. Escribir solo `bash` puede abrir el bash de WSL, que es otro sistema (Linux) y puede no tener `docker` disponible:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' infra/scripts/smoke.sh
 ```
 
 El script valida `compose.yaml`, levanta PostgreSQL (máximo 90 s) y revisa en las dos bases que respondan, que usen `UTF8`, zona horaria `UTC` y locale `builtin`; que los datos estén en el volumen `porteria_postgres-data`, que el puerto solo escuche en `127.0.0.1` y que Adminer no arranque sin `--profile tools`. Si algo falla, termina con `FALLO: ...` y código de salida 1. No apaga nada al terminar. La CI corre el mismo script en el job `infra`.
