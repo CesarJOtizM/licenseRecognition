@@ -51,6 +51,15 @@ uv run --directory services/api pytest    # pruebas con cobertura (mínimo 80 %)
 uv run --directory services/api mypy      # chequeo de tipos estricto
 ```
 
+Las pruebas marcadas `db` usan la base `porteria_test` de compose (`TEST_DATABASE_URL` la cambia). Si PostgreSQL no está levantado, se saltan con el motivo; con `API_TEST_REQUIRE_DB=1` (como en la CI) fallan.
+
+```powershell
+uv run --directory services/api pytest -m "not db" --no-cov   # lo que corre el pre-push, sin Docker
+$env:API_TEST_REQUIRE_DB = "1"; uv run --directory services/api pytest   # todas, como la CI
+```
+
+Si la base `porteria_test` no existe (volumen creado antes del paso 3): `docker compose -f infra/compose.yaml down -v`.
+
 ## Glosario
 
 El código usa nombres en inglés; esta es la equivalencia con el lenguaje del proyecto.

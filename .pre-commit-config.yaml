@@ -86,3 +86,20 @@ repos:
         files: ^packages/contracts/
         pass_filenames: false
         stages: [pre-push]
+
+      - id: mypy-api
+        name: mypy (api)
+        entry: uv run --directory services/api mypy
+        language: system
+        files: ^services/api/
+        types: [python]
+        pass_filenames: false
+
+      # Sin las pruebas `db`: el push no debe depender de Docker. La CI corre todas.
+      - id: pytest-api
+        name: pytest (api, sin base de datos)
+        entry: uv run --directory services/api pytest -m "not db" --no-cov
+        language: system
+        files: ^services/api/
+        pass_filenames: false
+        stages: [pre-push]

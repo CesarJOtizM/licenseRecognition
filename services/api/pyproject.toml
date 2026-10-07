@@ -31,6 +31,8 @@ addopts = [
   "-ra",
   "--strict-markers",
   "--strict-config",
+  "-p",
+  "pytester",
   "--cov=porteria_api",
   "--cov-report=term-missing",
 ]
