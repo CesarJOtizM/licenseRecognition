@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4: esqueleto ejecutable con `GET /health`. El esquema de la base (Alembic y tablas) llega en los siguientes PR del mismo paso.
+Fase 0, paso 4: esqueleto ejecutable con `GET /health` y migraciones con Alembic (revisión base vacía). Las tablas llegan en los siguientes PR del mismo paso.
 
 ## Estructura
 
@@ -12,10 +12,13 @@ Fase 0, paso 4: esqueleto ejecutable con `GET /health`. El esquema de la base (A
 services/api/
 ├── pyproject.toml          # dependencias y configuración de pytest, coverage y mypy
 ├── uv.lock                 # versiones exactas (se sube a git)
+├── alembic.ini             # configuración de Alembic (la URL sale de Settings)
+├── migrations/             # env.py, plantilla y versions/ (una revisión por cambio de esquema)
 ├── src/porteria_api/
 │   ├── config.py           # Settings: variables de entorno
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
+│   ├── models/base.py      # Base de los modelos y convención de nombres
 │   └── routes/health.py    # GET /health
 └── tests/
 ```
@@ -43,6 +46,20 @@ curl http://127.0.0.1:8000/health      # documentación interactiva en /docs
 
 `--factory` le dice a uvicorn que `create_app` es una función que devuelve la app, no la app misma.
 
+## Migraciones
+
+Una migración es un archivo de Python que cambia el esquema (crea una tabla, agrega una columna) y sabe deshacerse. Alembic anota en la tabla `alembic_version` cuál es la última aplicada. Los comandos usan `DATABASE_URL`:
+
+```powershell
+uv run --directory services/api alembic upgrade head        # aplica todas las pendientes
+uv run --directory services/api alembic downgrade -1        # deshace la última
+uv run --directory services/api alembic current             # muestra en qué revisión está la base
+uv run --directory services/api alembic revision --autogenerate -m "crea torres" --rev-id 0002
+uv run --directory services/api alembic check               # falla si los modelos tienen cambios sin migración
+```
+
+`--autogenerate` compara los modelos con la base y escribe un borrador: hay que revisarlo, porque no detecta todo (por ejemplo, cambios en un `CHECK`). Las revisiones se numeran a mano (`0002`, `0003`...) para que se lean en orden.
+
 ## Cómo se prueba
 
 ```powershell
@@ -57,6 +74,8 @@ Las pruebas marcadas `db` usan la base `porteria_test` de compose (`TEST_DATABAS
 uv run --directory services/api pytest -m "not db" --no-cov   # lo que corre el pre-push, sin Docker
 $env:API_TEST_REQUIRE_DB = "1"; uv run --directory services/api pytest   # todas, como la CI
 ```
+
+`tests/db/test_migrations.py` sube y baja cada revisión (prueba "stairway") y compara los modelos con la base migrada; siempre deja la base de pruebas en `head`.
 
 Si la base `porteria_test` no existe (volumen creado antes del paso 3): `docker compose -f infra/compose.yaml down -v`.
 
@@ -74,3 +93,5 @@ El código usa nombres en inglés; esta es la equivalencia con el lenguaje del p
 | chequeo de salud | health check |
 | ciclo de vida de la app | lifespan |
 | motor / sesión de base de datos | engine / session |
+| migración / revisión | migration / revision |
+| desfase entre modelos y base | drift |
