@@ -1,0 +1,51 @@
+[project]
+name = "porteria-api"
+version = "0.1.0"
+description = "Backend central de la portería: API REST y base de datos PostgreSQL"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.142,<0.143",
+  "psycopg[binary]>=3.3,<4",
+  "pydantic>=2.13,<3",
+  "pydantic-settings>=2.15,<3",
+  "sqlalchemy>=2.1,<2.2",
+  "uvicorn>=0.54,<0.55",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<0.29",
+  "mypy>=1.18",
+  "pytest>=8.4",
+  "pytest-cov>=7.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--cov=porteria_api",
+  "--cov-report=term-missing",
+]
+markers = ["db: necesita el PostgreSQL de compose (base porteria_test)"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
