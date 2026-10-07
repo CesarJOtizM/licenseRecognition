@@ -66,7 +66,10 @@ def test_el_drift_detecta_una_tabla_sin_migracion(
     alembic_config: Config, db_engine: Engine
 ) -> None:
     command.upgrade(alembic_config, "head")
-    metadata = MetaData()
+    # Copia de los modelos más una tabla nueva: la única diferencia debe ser esa tabla.
+    metadata = MetaData(naming_convention=Base.metadata.naming_convention)
+    for table in Base.metadata.sorted_tables:
+        table.to_metadata(metadata)
     Table("sin_migracion", metadata, Column("id", Integer, primary_key=True))
 
     (diff,) = _drift(db_engine, metadata)

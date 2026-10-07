@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4: esqueleto ejecutable con `GET /health` y migraciones con Alembic (revisión base vacía). Las tablas llegan en los siguientes PR del mismo paso.
+Fase 0, paso 4: esqueleto ejecutable con `GET /health`, migraciones con Alembic y la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras). Residentes, vehículos y visitantes llegan en el siguiente PR del mismo paso.
 
 ## Estructura
 
@@ -19,9 +19,13 @@ services/api/
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
+│   ├── models/enums.py     # valores fijos (sentido del carril, tipo de cámara)
+│   ├── models/site.py      # torres, unidades, porterías, carriles, cámaras, talanqueras
 │   └── routes/health.py    # GET /health
 └── tests/
 ```
+
+Topología: una torre tiene unidades (el número no se repite dentro de la torre); una portería tiene carriles, y cada carril tiene cámaras y una sola talanquera. Las porterías no dependen de una torre. El `code` del carril (por ejemplo `entrada-1`) es el `lane_id` que llega en cada lectura de placa. Las FK son `RESTRICT`: no se puede borrar un carril que todavía tiene cámaras. Los valores fijos (`entry`/`exit`, `ip`/`lpr`) se guardan como texto con un `CHECK`, no como tipo `ENUM` de PostgreSQL, para poder cambiarlos con una migración sencilla.
 
 - `create_app()` no se conecta a la base: el motor se crea al arrancar (lifespan) y se libera al apagar. Así importar el módulo o correr pruebas no necesita PostgreSQL.
 - Cada petición recibe su propia sesión (`SessionDep`) y se cierra al terminar.
@@ -88,7 +92,8 @@ El código usa nombres en inglés; esta es la equivalencia con el lenguaje del p
 | Español | Inglés (código) |
 |---|---|
 | portería | gatehouse |
-| carril | lane |
+| carril (de entrada o de salida) | lane (direction `entry` / `exit`) |
+| cámara (IP o lectora de placas) | camera (kind `ip` / `lpr`) |
 | puerta / talanquera | gate |
 | torre | tower |
 | unidad (apartamento o casa) | unit |
