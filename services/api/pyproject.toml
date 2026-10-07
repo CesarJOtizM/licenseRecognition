@@ -5,11 +5,13 @@ description = "Backend central de la portería: API REST y base de datos Postgre
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "alembic>=1.20,<2",
   "fastapi>=0.142,<0.143",
   "psycopg[binary]>=3.3,<4",
   "pydantic>=2.13,<3",
   "pydantic-settings>=2.15,<3",
   "sqlalchemy>=2.1,<2.2",
+  "uuid-utils>=1,<2",
   "uvicorn>=0.54,<0.55",
 ]
 
@@ -44,7 +46,8 @@ show_missing = true
 
 [tool.mypy]
 strict = true
-files = ["src", "tests"]
+# versions/ queda fuera: sus nombres empiezan con dígito y no son módulos válidos.
+files = ["src", "tests", "migrations/env.py"]
 plugins = ["pydantic.mypy"]
 
 [tool.pydantic-mypy]
