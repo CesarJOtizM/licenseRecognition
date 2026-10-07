@@ -18,7 +18,7 @@ services/api/
 │   ├── config.py           # Settings: variables de entorno
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
-│   ├── models/base.py      # Base de los modelos y convención de nombres
+│   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
 │   └── routes/health.py    # GET /health
 └── tests/
 ```
@@ -74,6 +74,8 @@ Las pruebas marcadas `db` usan la base `porteria_test` de compose (`TEST_DATABAS
 uv run --directory services/api pytest -m "not db" --no-cov   # lo que corre el pre-push, sin Docker
 $env:API_TEST_REQUIRE_DB = "1"; uv run --directory services/api pytest   # todas, como la CI
 ```
+
+Las pruebas que escriben en la base usan el fixture `db_session` (o `client`, que hace que la API use esa misma sesión): todo corre en una transacción que se deshace al terminar, así que una prueba no ve los datos de otra. Las convenciones están en el [ADR 0006](../../docs/decisiones/0006-convenciones-base-de-datos.md).
 
 `tests/db/test_migrations.py` sube y baja cada revisión (prueba "stairway") y compara los modelos con la base migrada; siempre deja la base de pruebas en `head`.
 
