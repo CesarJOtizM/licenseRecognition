@@ -73,6 +73,13 @@ jobs:
       - name: Instalar dependencias de api
         run: uv sync --locked --directory services/api
 
+      # Por el CLI, como en desarrollo, sobre la base `porteria`; check falla si
+      # los modelos tienen cambios que ninguna migración recoge.
+      - name: Migraciones (upgrade head y check)
+        run: |
+          uv run --directory services/api alembic upgrade head
+          uv run --directory services/api alembic check
+
       - name: Pruebas de api (todas, con cobertura)
         run: uv run --directory services/api pytest
 
