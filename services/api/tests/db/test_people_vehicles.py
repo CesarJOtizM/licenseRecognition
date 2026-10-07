@@ -46,7 +46,7 @@ def unit(db_session: Session) -> Unit:
 
 
 def _vehicle(unit: Unit, plate: str = "ABC123", status: VehicleStatus | None = None) -> Vehicle:
-    vehicle = Vehicle(unit_id=unit.id, plate=plate, plate_kind=PlateKind.CAR)
+    vehicle = Vehicle(unit_id=unit.id, plate=plate)
     if status is not None:
         vehicle.status = status
     return vehicle
@@ -98,6 +98,60 @@ def test_una_placa_sin_normalizar_viola_el_check(
             " VALUES (:id, :unit_id, :plate, 'car', 'active')",
             unit_id=unit.id,
             plate=plate,
+        )
+
+
+@pytest.mark.parametrize(
+    ("plate", "kind"),
+    [("ABC123", PlateKind.CAR), ("abc 12d", PlateKind.MOTORCYCLE), ("AB1234", PlateKind.UNKNOWN)],
+)
+def test_el_tipo_se_deriva_de_la_placa(
+    db_session: Session, unit: Unit, plate: str, kind: PlateKind
+) -> None:
+    vehicle = _add(db_session, _vehicle(unit, plate=plate))
+
+    raw = db_session.scalar(
+        text("SELECT plate_kind FROM vehicles WHERE id = :id"), {"id": vehicle.id}
+    )
+
+    assert vehicle.plate_kind is kind
+    assert raw == kind.value
+
+
+def test_cambiar_la_placa_recalcula_el_tipo(db_session: Session, unit: Unit) -> None:
+    vehicle = _add(db_session, _vehicle(unit))
+
+    vehicle.plate = "ABC12D"
+    db_session.flush()
+
+    assert vehicle.plate_kind is PlateKind.MOTORCYCLE
+
+
+@pytest.mark.parametrize(
+    ("plate", "kind"),
+    [("ABC123", "motorcycle"), ("ABC12D", "car"), ("AB1234", "car"), ("ABC123", "unknown")],
+)
+def test_un_tipo_que_contradice_la_placa_viola_el_check(
+    db_session: Session, unit: Unit, plate: str, kind: str
+) -> None:
+    with _violates("ck_vehicles_plate_kind_matches_plate"):
+        _raw(
+            db_session,
+            "INSERT INTO vehicles (id, unit_id, plate, plate_kind, status)"
+            " VALUES (:id, :unit_id, :plate, :kind, 'active')",
+            unit_id=unit.id,
+            plate=plate,
+            kind=kind,
+        )
+
+
+def test_un_tipo_explicito_que_contradice_la_placa_no_se_guarda(
+    db_session: Session, unit: Unit
+) -> None:
+    with _violates("ck_vehicles_plate_kind_matches_plate"):
+        _add(
+            db_session,
+            Vehicle(unit_id=unit.id, plate="ABC123", plate_kind=PlateKind.MOTORCYCLE),
         )
 
 

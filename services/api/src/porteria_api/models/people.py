@@ -2,7 +2,7 @@
 
 import uuid
 
-from lr_contracts import PlateKind, normalize_plate
+from lr_contracts import PlateKind, classify_plate, normalize_plate
 from sqlalchemy import CheckConstraint, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
@@ -10,6 +10,12 @@ from porteria_api.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from porteria_api.models.enums import DocumentType, ResidentStatus, VehicleStatus, enum_type
 
 PLATE_LENGTH = 10
+# Mismos formatos que `lr_contracts.classify_plate`; el CHECK los repite para que SQL directo
+# tampoco guarde un tipo que contradiga la placa.
+PLATE_KIND_MATCHES_PLATE = (
+    "(plate_kind = 'car') = (plate ~ '^[A-Z]{3}[0-9]{3}$')"
+    " AND (plate_kind = 'motorcycle') = (plate ~ '^[A-Z]{3}[0-9]{2}[A-Z]$')"
+)
 
 
 class Resident(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -27,12 +33,14 @@ class Resident(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class Vehicle(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """La placa se guarda como la produce `normalize_plate` (`ABC123`), igual que en `PlateRead`.
 
-    Una placa no puede estar en dos vehículos vigentes; los `inactive` quedan como historia.
+    `plate_kind` se deriva de la placa con `classify_plate`. Una placa no puede estar en dos
+    vehículos vigentes; los `inactive` quedan como historia.
     """
 
     __tablename__ = "vehicles"
     __table_args__ = (
         CheckConstraint(f"plate ~ '^[A-Z0-9]{{3,{PLATE_LENGTH}}}$'", name="plate_format"),
+        CheckConstraint(PLATE_KIND_MATCHES_PLATE, name="plate_kind_matches_plate"),
         Index(
             "uq_vehicles_plate_not_inactive",
             "plate",
@@ -52,7 +60,9 @@ class Vehicle(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     @validates("plate")
     def _normalize_plate(self, _key: str, plate: str) -> str:
-        return normalize_plate(plate)
+        normalized = normalize_plate(plate)
+        self.plate_kind = classify_plate(normalized)
+        return normalized
 
 
 class Visitor(UUIDPrimaryKeyMixin, TimestampMixin, Base):
