@@ -36,7 +36,7 @@ flowchart LR
     Decision --> LocalImg[("Disco local: fotos de cada evento")]
   end
   LocalDB <-->|"sincronización outbox"| API["Backend FastAPI"]
-  LocalImg -.->|"subida opcional"| Storage[("Nube: S3 o MinIO")]
+  LocalImg -.->|"subida opcional"| Storage[("Nube: almacenamiento compatible con S3")]
   API --> PG[("PostgreSQL")]
   API --> Notif["WhatsApp y Web Push"]
   Web["Next.js: guarda, admin y residente"] <-->|"REST + WebSocket"| API
@@ -50,7 +50,7 @@ Las decisiones de diseño más importantes:
 - **El sistema convive con los mandos que ya tiene la puerta.** El relé se conecta en paralelo a la entrada de apertura (contacto seco o pulsador) de la tarjeta del motor, así que el control remoto y el pulsador manual siguen funcionando igual. El sistema solo envía un pulso de apertura y nunca bloquea ni reemplaza los mandos existentes. Si el equipo local falla o se apaga, la puerta sigue operando como antes.
 - **Las aperturas por control remoto o pulsador también quedan registradas.** Un sensor de estado de la puerta (final de carrera o sensor magnético) leído por el mismo módulo del relé detecta cada apertura. Si la puerta se abre sin que el sistema la haya ordenado, se registra como apertura externa y se asocia con la placa que lea la cámara en ese momento, si la hay.
 - **El equipo local funciona sin internet.** Cada portería guarda una copia local de las placas y preautorizaciones vigentes. Las aperturas se deciden ahí mismo, en menos de 1,5 s, y los eventos se encolan y se sincronizan cuando vuelve la conexión.
-- **Las imágenes se guardan siempre en local y la subida a la nube es opcional.** Se manejan detrás de una interfaz `ImageStore`. `LocalImageStore` guarda cada foto en el disco del equipo local, organizada por fecha (por ejemplo `data/images/2026/10/04/<evento>.jpg`). `CloudImageStore` sube una copia a S3 o MinIO solo si está activado en la configuración (`IMAGES_CLOUD_UPLOAD=true`). La subida va por la misma cola de sincronización, así que no frena la apertura de la puerta y se reintenta si no hay internet. La base de datos guarda la ruta local de cada foto y, si se subió, su ubicación en la nube.
+- **Las imágenes se guardan siempre en local y la subida a la nube es opcional.** Se manejan detrás de una interfaz `ImageStore`. `LocalImageStore` guarda cada foto en el disco del equipo local, organizada por fecha (por ejemplo `data/images/2026/10/04/<evento>.jpg`). `CloudImageStore` sube una copia a un almacenamiento compatible con S3 solo si está activado en la configuración (`IMAGES_CLOUD_UPLOAD=true`). La subida va por la misma cola de sincronización, así que no frena la apertura de la puerta y se reintenta si no hay internet. La base de datos guarda la ruta local de cada foto y, si se subió, su ubicación en la nube.
 - **La dirección (ingreso o salida) viene del carril.** Cada cámara se configura como de entrada o de salida, en vez de inferir la dirección desde la imagen.
 
 ## Pipeline de visión (webcam y cámaras IP)
@@ -101,7 +101,7 @@ licenseRecognition/
 ├── services/edge-agent/   # captura, ANPR, adaptadores LPR, decisión, puerta, sincronización
 ├── packages/contracts/    # contratos compartidos entre servicios, como PlateRead (ADR 0004)
 ├── ml/                    # datasets, entrenamiento y evaluación de YOLO y OCR
-├── infra/                 # docker-compose (Postgres, API, web, edge; MinIO opcional para probar la subida a la nube)
+├── infra/                 # docker compose: hoy PostgreSQL y Adminer (ADR 0005); luego API, web, edge y almacenamiento compatible con S3 opcional
 └── docs/                  # arquitectura, decisiones (ADRs), privacidad
 ```
 
@@ -121,7 +121,7 @@ El objetivo es entender cada pieza, no solo que funcione. Por eso:
 1. **Fase 0, base (alrededor de 1 semana):** monorepo, docker-compose, esquema de la base de datos, autenticación y roles, y el contrato `PlateRead`. Se hace en pasos pequeños, cada uno con su commit:
    - [x] Paso 1: esqueleto del monorepo, git y convenciones (ADR [0001](decisiones/0001-monorepo.md) y [0002](decisiones/0002-herramientas-uv-pnpm.md)).
    - [x] Paso 2: contrato `PlateRead` con sus pruebas.
-   - [ ] Paso 3: docker-compose con PostgreSQL (requiere Docker Desktop).
+   - [x] Paso 3: docker compose con PostgreSQL 18 y Adminer opcional, más la prueba de humo `infra/scripts/smoke.sh` (ADR [0005](decisiones/0005-infraestructura-local-docker-compose.md); requiere Docker Desktop).
    - [ ] Paso 4: API FastAPI con el esquema de la base de datos (SQLAlchemy y Alembic).
    - [ ] Paso 5: autenticación y roles (admin, guarda y residente).
 2. **Fase 1, ANPR (2 a 3 semanas):** primero un prototipo con la webcam (placas impresas o fotos en pantalla, luego vehículos reales) para validar el pipeline de punta a punta. Después, reunir un dataset de placas colombianas, ajustar YOLO, montar el pipeline de OCR y validación, y armar un banco de pruebas con videos grabados. Las metas son al menos 95 % de exactitud por placa de día y menos de 1,5 s de latencia.
