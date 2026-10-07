@@ -18,6 +18,28 @@ class CameraKind(enum.StrEnum):
     LPR = "lpr"
 
 
+class ResidentStatus(enum.StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+class VehicleStatus(enum.StrEnum):
+    """`blocked` sigue registrado (no se puede reusar su placa) pero no abre la puerta."""
+
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    INACTIVE = "inactive"
+
+
+class DocumentType(enum.StrEnum):
+    """Cédula de ciudadanía, cédula de extranjería, pasaporte u otro."""
+
+    CC = "cc"
+    CE = "ce"
+    PASSPORT = "passport"
+    OTHER = "other"
+
+
 def _values(enum_cls: type[enum.Enum]) -> list[str]:
     return [str(member.value) for member in enum_cls]
 

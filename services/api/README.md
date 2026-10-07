@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4: esqueleto ejecutable con `GET /health`, migraciones con Alembic y la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras). Residentes, vehículos y visitantes llegan en el siguiente PR del mismo paso.
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes).
 
 ## Estructura
 
@@ -19,13 +19,16 @@ services/api/
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
-│   ├── models/enums.py     # valores fijos (sentido del carril, tipo de cámara)
+│   ├── models/enums.py     # valores fijos (sentido del carril, estados, tipo de documento...)
 │   ├── models/site.py      # torres, unidades, porterías, carriles, cámaras, talanqueras
+│   ├── models/people.py    # residentes, vehículos y visitantes
 │   └── routes/health.py    # GET /health
 └── tests/
 ```
 
 Topología: una torre tiene unidades (el número no se repite dentro de la torre); una portería tiene carriles, y cada carril tiene cámaras y una sola talanquera. Las porterías no dependen de una torre. El `code` del carril (por ejemplo `entrada-1`) es el `lane_id` que llega en cada lectura de placa. Las FK son `RESTRICT`: no se puede borrar un carril que todavía tiene cámaras. Los valores fijos (`entry`/`exit`, `ip`/`lpr`) se guardan como texto con un `CHECK`, no como tipo `ENUM` de PostgreSQL, para poder cambiarlos con una migración sencilla.
+
+Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (llegan a una unidad en cada visita). La placa se guarda normalizada con `normalize_plate` de [`lr-contracts`](../../packages/contracts/README.md) (`abc 123` queda `ABC123`), igual que en cada `PlateRead`, y un `CHECK` rechaza lo que no sea `^[A-Z0-9]{3,10}$`. Un índice único parcial (`WHERE status <> 'inactive'`) impide que dos vehículos vigentes (`active` o `blocked`) tengan la misma placa, pero deja guardar como historia los vehículos dados de baja (`inactive`). El documento del visitante es único por tipo: `cc 123` y `ce 123` son personas distintas.
 
 - `create_app()` no se conecta a la base: el motor se crea al arrancar (lifespan) y se libera al apagar. Así importar el módulo o correr pruebas no necesita PostgreSQL.
 - Cada petición recibe su propia sesión (`SessionDep`) y se cierra al terminar.
@@ -97,6 +100,12 @@ El código usa nombres en inglés; esta es la equivalencia con el lenguaje del p
 | puerta / talanquera | gate |
 | torre | tower |
 | unidad (apartamento o casa) | unit |
+| residente (vigente o retirado) | resident (status `active` / `inactive`) |
+| vehículo (vigente, bloqueado o dado de baja) | vehicle (status `active` / `blocked` / `inactive`) |
+| tipo de placa (carro, moto, desconocido) | plate_kind (`car` / `motorcycle` / `unknown`) |
+| visitante | visitor |
+| tipo de documento (cédula, cédula de extranjería, pasaporte, otro) | document_type (`cc` / `ce` / `passport` / `other`) |
+| índice único parcial | partial unique index |
 | chequeo de salud | health check |
 | ciclo de vida de la app | lifespan |
 | motor / sesión de base de datos | engine / session |
