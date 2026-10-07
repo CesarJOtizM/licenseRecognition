@@ -23,6 +23,9 @@ jobs:
       - name: Instalar dependencias de edge-agent
         run: uv sync --locked --directory services/edge-agent
 
+      - name: Instalar dependencias de api
+        run: uv sync --locked --directory services/api
+
       - name: Chequeos de pre-commit (formato, lint y tipos)
         run: uvx pre-commit run --all-files --show-diff-on-failure
 
@@ -49,3 +52,34 @@ jobs:
       - name: Apagar y borrar volumenes
         if: always()
         run: docker compose -f infra/compose.yaml --profile tools down -v
+
+  api:
+    name: API con PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Si la base no responde, las pruebas `db` fallan en vez de saltarse.
+      API_TEST_REQUIRE_DB: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Levantar PostgreSQL
+        run: docker compose -f infra/compose.yaml up -d --wait --wait-timeout 90
+
+      - name: Instalar dependencias de api
+        run: uv sync --locked --directory services/api
+
+      - name: Pruebas de api (todas, con cobertura)
+        run: uv run --directory services/api pytest
+
+      - name: Logs de PostgreSQL (solo si fallo)
+        if: failure()
+        run: docker compose -f infra/compose.yaml logs --no-color
+
+      - name: Apagar y borrar volumenes
+        if: always()
+        run: docker compose -f infra/compose.yaml down -v
