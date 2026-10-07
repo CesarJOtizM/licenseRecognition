@@ -11,3 +11,4 @@ Cada archivo se llama `NNNN-titulo.md` y sigue la [plantilla](0000-plantilla.md)
 | [0003](0003-calidad-de-codigo.md) | Ruff, mypy estricto, pytest, pre-commit y CI | Aceptado |
 | [0004](0004-paquete-de-contratos-compartido.md) | Paquete de contratos compartido en `packages/contracts` | Aceptado |
 | [0005](0005-infraestructura-local-docker-compose.md) | Infraestructura local con Docker Compose: PostgreSQL 18 y Adminer opcional | Aceptado |
+| [0006](0006-convenciones-base-de-datos.md) | Convenciones de la base de datos (nombres, UUIDv7, fechas, enums) y migraciones con Alembic | Aceptado |
