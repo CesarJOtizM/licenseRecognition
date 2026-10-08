@@ -41,7 +41,7 @@ Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (ll
 | `DATABASE_URL` | `postgresql+psycopg://porteria:porteria@127.0.0.1:5432/porteria` | base de la API (la de `infra/compose.yaml`) |
 | `DB_CONNECT_TIMEOUT` | `3` | segundos máximos para abrir una conexión |
 | `JWT_SECRET` | ninguno (obligatorio para la API) | firma los tokens de acceso; mínimo 32 caracteres. Alembic no lo necesita |
-| `JWT_ALGORITHM` | `HS256` | `HS256`, `HS384` o `HS512` |
+| `JWT_ALGORITHM` | `HS256` | Solo `HS256` |
 | `ACCESS_TOKEN_MINUTES` | `30` | minutos que dura un token de acceso (1 a 1440) |
 
 ## Cómo se ejecuta
