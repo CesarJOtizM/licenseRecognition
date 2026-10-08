@@ -15,8 +15,7 @@ services/api/
 ├── alembic.ini             # configuración de Alembic (la URL sale de Settings)
 ├── migrations/             # env.py, plantilla y versions/ (una revisión por cambio de esquema)
 ├── src/porteria_api/
-│   ├── config.py           # Settings: variables de entorno
-│   ├── db.py               # motor de SQLAlchemy y sesión por petición
+│   ├── config.py           # DatabaseSettings y Settings: variables de entorno│   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
 │   ├── models/enums.py     # valores fijos (sentido del carril, estados, tipo de documento...)
@@ -40,6 +39,9 @@ Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (ll
 |---|---|---|
 | `DATABASE_URL` | `postgresql+psycopg://porteria:porteria@127.0.0.1:5432/porteria` | base de la API (la de `infra/compose.yaml`) |
 | `DB_CONNECT_TIMEOUT` | `3` | segundos máximos para abrir una conexión |
+| `JWT_SECRET` | ninguno (obligatorio para la API) | firma los tokens de acceso; mínimo 32 caracteres. Alembic no lo necesita |
+| `JWT_ALGORITHM` | `HS256` | `HS256`, `HS384` o `HS512` |
+| `ACCESS_TOKEN_MINUTES` | `30` | minutos que dura un token de acceso (1 a 1440) |
 
 ## Cómo se ejecuta
 
@@ -47,6 +49,7 @@ Desde la raíz del repositorio, con PostgreSQL levantado ([infra](../../infra/RE
 
 ```powershell
 docker compose -f infra/compose.yaml up -d --wait
+$env:JWT_SECRET = python -c "import secrets; print(secrets.token_urlsafe(48))"
 uv run --directory services/api uvicorn porteria_api.app:create_app --factory --reload
 curl http://127.0.0.1:8000/health      # documentación interactiva en /docs
 ```

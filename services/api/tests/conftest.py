@@ -7,12 +7,14 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from porteria_api.app import create_app
-from porteria_api.config import Settings
+from porteria_api.config import DatabaseSettings, Settings
 from porteria_api.db import create_db_engine, get_session
+from pydantic import SecretStr
 from sqlalchemy import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+TEST_JWT_SECRET = SecretStr("secreto-de-pruebas-con-al-menos-32-caracteres")
 DEFAULT_TEST_DATABASE_URL = "postgresql+psycopg://porteria:porteria@127.0.0.1:5432/porteria_test"
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 
@@ -31,7 +33,7 @@ def make_alembic_config(engine: Engine) -> Config:
 def _probed_engine() -> Iterator[Engine]:
     """Motor de la base de pruebas; se conecta una vez para saber si está disponible."""
     url = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
-    engine = create_db_engine(Settings(database_url=url))
+    engine = create_db_engine(DatabaseSettings(database_url=url))
     try:
         with engine.connect():
             pass
@@ -94,7 +96,7 @@ def db_session(migrated_engine: Engine) -> Iterator[Session]:
 def client(migrated_engine: Engine, db_session: Session) -> Iterator[TestClient]:
     """Cliente HTTP cuya sesión por petición es `db_session`."""
     url = migrated_engine.url.render_as_string(hide_password=False)
-    app = create_app(Settings(database_url=url))
+    app = create_app(Settings(database_url=url, jwt_secret=TEST_JWT_SECRET))
     app.dependency_overrides[get_session] = lambda: db_session
     with TestClient(app) as test_client:
         yield test_client

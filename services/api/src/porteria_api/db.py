@@ -7,10 +7,10 @@ from fastapi import Depends, Request
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from porteria_api.config import Settings
+from porteria_api.config import DatabaseSettings
 
 
-def create_db_engine(settings: Settings) -> Engine:
+def create_db_engine(settings: DatabaseSettings) -> Engine:
     """Crea el motor sin conectarse: la primera conexión se abre al usarlo."""
     return create_engine(
         settings.database_url,
