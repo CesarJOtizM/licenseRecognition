@@ -3,7 +3,7 @@
 from logging.config import fileConfig
 
 from alembic import context
-from porteria_api.config import Settings
+from porteria_api.config import DatabaseSettings
 from porteria_api.models import Base
 from sqlalchemy import create_engine, pool
 
@@ -13,7 +13,7 @@ if config.config_file_name is not None and config.attributes.get("configure_logg
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
-settings = Settings()
+settings = DatabaseSettings()
 
 
 def _database_url() -> str:

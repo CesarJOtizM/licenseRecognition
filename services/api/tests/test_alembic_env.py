@@ -22,7 +22,9 @@ def test_con_la_base_caida_falla_en_vez_de_quedarse_esperando(
         command.upgrade(config, "head")
 
 
-def test_modo_offline_genera_el_sql_de_las_revisiones() -> None:
+def test_modo_offline_genera_el_sql_de_las_revisiones(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Alembic no usa el secreto de los tokens: la CI corre migraciones sin JWT_SECRET.
+    monkeypatch.delenv("JWT_SECRET", raising=False)
     output = io.StringIO()
     config = Config(ALEMBIC_INI, output_buffer=output, attributes={"configure_logger": False})
 
