@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes).
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa).
 
 ## Estructura
 
@@ -28,7 +28,7 @@ services/api/
 
 Topología: una torre tiene unidades (el número no se repite dentro de la torre); una portería tiene carriles, y cada carril tiene cámaras y una sola talanquera. Las porterías no dependen de una torre. El `code` del carril (por ejemplo `entrada-1`) es el `lane_id` que llega en cada lectura de placa. Las FK son `RESTRICT`: no se puede borrar un carril que todavía tiene cámaras. Los valores fijos (`entry`/`exit`, `ip`/`lpr`) se guardan como texto con un `CHECK`, no como tipo `ENUM` de PostgreSQL, para poder cambiarlos con una migración sencilla.
 
-Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (llegan a una unidad en cada visita). La placa se guarda normalizada con `normalize_plate` de [`lr-contracts`](../../packages/contracts/README.md) (`abc 123` queda `ABC123`), igual que en cada `PlateRead`, y un `CHECK` rechaza lo que no sea `^[A-Z0-9]{3,10}$`. Un índice único parcial (`WHERE status <> 'inactive'`) impide que dos vehículos vigentes (`active` o `blocked`) tengan la misma placa, pero deja guardar como historia los vehículos dados de baja (`inactive`). El documento del visitante es único por tipo: `cc 123` y `ce 123` son personas distintas.
+Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (llegan a una unidad en cada visita). La placa se guarda normalizada con `normalize_plate` de [`lr-contracts`](../../packages/contracts/README.md) (`abc 123` queda `ABC123`), igual que en cada `PlateRead`, y un `CHECK` rechaza lo que no sea `^[A-Z0-9]{3,10}$`. `plate_kind` no se escribe a mano: sale de `classify_plate` al asignar la placa, y el `CHECK` `ck_vehicles_plate_kind_matches_plate` rechaza un tipo que contradiga la placa (por ejemplo `ABC123` como `motorcycle`), aunque llegue por SQL directo. Un índice único parcial (`WHERE status <> 'inactive'`) impide que dos vehículos vigentes (`active` o `blocked`) tengan la misma placa, pero deja guardar como historia los vehículos dados de baja (`inactive`). El documento del visitante es único por tipo: `cc 123` y `ce 123` son personas distintas.
 
 - `create_app()` no se conecta a la base: el motor se crea al arrancar (lifespan) y se libera al apagar. Así importar el módulo o correr pruebas no necesita PostgreSQL.
 - Cada petición recibe su propia sesión (`SessionDep`) y se cierra al terminar.
@@ -65,7 +65,7 @@ uv run --directory services/api alembic revision --autogenerate -m "crea torres"
 uv run --directory services/api alembic check               # falla si los modelos tienen cambios sin migración
 ```
 
-`--autogenerate` compara los modelos con la base y escribe un borrador: hay que revisarlo, porque no detecta todo (por ejemplo, cambios en un `CHECK`). Las revisiones se numeran a mano (`0002`, `0003`...) para que se lean en orden.
+`--autogenerate` compara los modelos con la base y escribe un borrador: hay que revisarlo, porque no detecta todo (por ejemplo, cambios en un `CHECK`). Las revisiones se numeran a mano (`0002`, `0003`...) para que se lean en orden. Una revisión que ya está en `main` no se edita: una base que ya la aplicó no la vuelve a correr, así que el cambio va en una revisión nueva.
 
 ## Cómo se prueba
 
