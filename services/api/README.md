@@ -15,7 +15,8 @@ services/api/
 ├── alembic.ini             # configuración de Alembic (la URL sale de Settings)
 ├── migrations/             # env.py, plantilla y versions/ (una revisión por cambio de esquema)
 ├── src/porteria_api/
-│   ├── config.py           # DatabaseSettings y Settings: variables de entorno│   ├── db.py               # motor de SQLAlchemy y sesión por petición
+│   ├── config.py           # DatabaseSettings y Settings: variables de entorno
+│   ├── security.py         # hash de contraseñas (Argon2id) y tokens de acceso (JWT)│   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
 │   ├── models/enums.py     # valores fijos (sentido del carril, estados, tipo de documento...)
