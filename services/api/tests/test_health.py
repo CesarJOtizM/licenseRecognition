@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from unittest.mock import create_autospec
 
 import pytest
+from conftest import TEST_JWT_SECRET
 from fastapi.testclient import TestClient
 from porteria_api.app import create_app
 from porteria_api.config import Settings
@@ -19,7 +20,7 @@ def test_health_responde_200_si_la_base_contesta() -> None:
     def override() -> Iterator[Session]:
         yield session
 
-    app = create_app(Settings(database_url=UNREACHABLE_URL))
+    app = create_app(Settings(database_url=UNREACHABLE_URL, jwt_secret=TEST_JWT_SECRET))
     app.dependency_overrides[get_session] = override
     with TestClient(app) as client:
         response = client.get("/health")
@@ -32,7 +33,9 @@ def test_health_responde_200_si_la_base_contesta() -> None:
 def test_health_responde_503_sin_filtrar_el_error_si_no_hay_base(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    app = create_app(Settings(database_url=UNREACHABLE_URL, db_connect_timeout=1))
+    app = create_app(
+        Settings(database_url=UNREACHABLE_URL, db_connect_timeout=1, jwt_secret=TEST_JWT_SECRET)
+    )
     with TestClient(app) as client, caplog.at_level(logging.WARNING):
         response = client.get("/health")
 

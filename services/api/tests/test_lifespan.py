@@ -2,9 +2,11 @@ from unittest.mock import create_autospec
 
 import porteria_api.app as app_module
 import pytest
+from conftest import TEST_JWT_SECRET
 from fastapi.testclient import TestClient
 from porteria_api.app import create_app
 from porteria_api.config import Settings
+from pydantic import ValidationError
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
@@ -15,7 +17,7 @@ def test_el_motor_se_crea_al_arrancar_y_se_libera_al_apagar(
     engine = create_autospec(Engine, instance=True)
     monkeypatch.setattr(app_module, "create_db_engine", lambda settings: engine)
 
-    app = create_app(Settings())
+    app = create_app(Settings(jwt_secret=TEST_JWT_SECRET))
     assert not hasattr(app.state, "engine")
 
     with TestClient(app):
@@ -25,9 +27,16 @@ def test_el_motor_se_crea_al_arrancar_y_se_libera_al_apagar(
     engine.dispose.assert_called_once_with()
 
 
+def test_sin_jwt_secret_create_app_falla_al_instante(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+
+    with pytest.raises(ValidationError, match="jwt_secret"):
+        create_app()
+
+
 def test_cada_peticion_cierra_su_sesion() -> None:
     session = create_autospec(Session, instance=True)
-    app = create_app(Settings())
+    app = create_app(Settings(jwt_secret=TEST_JWT_SECRET))
 
     with TestClient(app) as client:
         app.state.sessionmaker = lambda: session
