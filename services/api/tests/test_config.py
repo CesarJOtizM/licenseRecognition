@@ -27,14 +27,12 @@ def test_sin_variables_de_entorno_usa_los_valores_por_defecto() -> None:
 def test_las_variables_de_entorno_ganan(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/otra")
     monkeypatch.setenv("DB_CONNECT_TIMEOUT", "7")
-    monkeypatch.setenv("JWT_ALGORITHM", "HS512")
     monkeypatch.setenv("ACCESS_TOKEN_MINUTES", "5")
 
     settings = Settings()
 
     assert settings.database_url == "postgresql+psycopg://u:p@db:5432/otra"
     assert settings.db_connect_timeout == 7
-    assert settings.jwt_algorithm == "HS512"
     assert settings.access_token_minutes == 5
 
 
@@ -75,8 +73,8 @@ def test_la_duracion_del_token_tiene_limites(minutes: int) -> None:
         Settings(access_token_minutes=minutes)
 
 
-@pytest.mark.parametrize("algorithm", ["none", "RS256"])
-def test_solo_se_aceptan_algoritmos_hmac(monkeypatch: pytest.MonkeyPatch, algorithm: str) -> None:
+@pytest.mark.parametrize("algorithm", ["none", "RS256", "HS512"])
+def test_solo_se_acepta_hs256(monkeypatch: pytest.MonkeyPatch, algorithm: str) -> None:
     monkeypatch.setenv("JWT_ALGORITHM", algorithm)
 
     with pytest.raises(ValidationError):

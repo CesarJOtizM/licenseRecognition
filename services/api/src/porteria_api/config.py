@@ -24,6 +24,7 @@ class Settings(DatabaseSettings):
     """Configuración completa de la API; sin JWT_SECRET no arranca."""
 
     jwt_secret: SecretStr = Field(min_length=32)
-    # Solo HMAC: así un token firmado con "none" o con llave pública nunca se acepta.
-    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
+    # Solo HS256: un token "none" o de llave pública nunca se acepta, y los 32 caracteres del
+    # secreto alcanzan (HS384/HS512 piden 48/64).
+    jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_minutes: int = Field(default=30, ge=1, le=1440)
