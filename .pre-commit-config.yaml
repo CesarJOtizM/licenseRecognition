@@ -51,7 +51,7 @@ repos:
 
   # Hooks locales: usan el entorno de cada servicio (uv) porque mypy y pytest
   # necesitan las dependencias del servicio para funcionar.
-  # edge-agent también se revisa cuando cambia packages/contracts, porque depende de él.
+  # edge-agent y api también se revisan cuando cambia packages/contracts, porque dependen de él.
   - repo: local
     hooks:
       - id: mypy-edge-agent
@@ -91,7 +91,7 @@ repos:
         name: mypy (api)
         entry: uv run --directory services/api mypy
         language: system
-        files: ^services/api/
+        files: ^(services/api|packages/contracts)/
         types: [python]
         pass_filenames: false
 
@@ -100,6 +100,6 @@ repos:
         name: pytest (api, sin base de datos)
         entry: uv run --directory services/api pytest -m "not db" --no-cov
         language: system
-        files: ^services/api/
+        files: ^(services/api|packages/contracts)/
         pass_filenames: false
         stages: [pre-push]

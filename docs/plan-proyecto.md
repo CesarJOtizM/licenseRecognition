@@ -86,6 +86,8 @@ Por seguridad, nunca se abre automáticamente con coincidencias aproximadas. Esa
   - `Visita`: ingreso y salida emparejados, con su tiempo de permanencia.
 - **Seguridad:** `Usuario` con roles (admin, guarda, residente) y `Auditoria` de las acciones manuales, como aperturas forzadas y ediciones.
 
+Hoy existen Infraestructura y Personas (Fase 0, paso 4; detalle en [services/api](../services/api/README.md)). La placa del vehículo se guarda normalizada como en `PlateRead` y no se repite entre vehículos vigentes; Accesos y Seguridad llegan en las fases siguientes.
+
 ## Interfaz web (Next.js)
 
 - **Consola del guarda:** muestra en tiempo real las lecturas con su foto (por WebSocket) y tiene botones de abrir y rechazar. Permite registrar un visitante rápido (placa, documento y unidad de destino) y consultar la bitácora del turno.
@@ -122,7 +124,7 @@ El objetivo es entender cada pieza, no solo que funcione. Por eso:
    - [x] Paso 1: esqueleto del monorepo, git y convenciones (ADR [0001](decisiones/0001-monorepo.md) y [0002](decisiones/0002-herramientas-uv-pnpm.md)).
    - [x] Paso 2: contrato `PlateRead` con sus pruebas.
    - [x] Paso 3: docker compose con PostgreSQL 18 y Adminer opcional, más la prueba de humo `infra/scripts/smoke.sh` (ADR [0005](decisiones/0005-infraestructura-local-docker-compose.md); requiere Docker Desktop).
-   - [ ] Paso 4: API FastAPI con el esquema de la base de datos (SQLAlchemy y Alembic).
+   - [x] Paso 4: API FastAPI con el esquema de la base de datos (SQLAlchemy y Alembic; ADR [0006](decisiones/0006-convenciones-base-de-datos.md)).
    - [ ] Paso 5: autenticación y roles (admin, guarda y residente).
 2. **Fase 1, ANPR (2 a 3 semanas):** primero un prototipo con la webcam (placas impresas o fotos en pantalla, luego vehículos reales) para validar el pipeline de punta a punta. Después, reunir un dataset de placas colombianas, ajustar YOLO, montar el pipeline de OCR y validación, y armar un banco de pruebas con videos grabados. Las metas son al menos 95 % de exactitud por placa de día y menos de 1,5 s de latencia.
 3. **Fase 2, equipo local y decisión (alrededor de 2 semanas):** motor de decisión, `SimulatedGate`, caché local, outbox de sincronización y el adaptador para la cámara LPR.
