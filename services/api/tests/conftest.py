@@ -1,6 +1,9 @@
+import itertools
 import os
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from alembic import command
@@ -9,12 +12,18 @@ from fastapi.testclient import TestClient
 from porteria_api.app import create_app
 from porteria_api.config import DatabaseSettings, Settings
 from porteria_api.db import create_db_engine, get_session
+from porteria_api.models import Resident, Tower, Unit, User, UserRole, UserStatus
+from porteria_api.security import Passwords, encode_access_token
+from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
 from pydantic import SecretStr
 from sqlalchemy import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 TEST_JWT_SECRET = SecretStr("secreto-de-pruebas-con-al-menos-32-caracteres")
+TEST_PASSWORD = "contrasena-de-pruebas"  # noqa: S105
+TEST_TOKEN_MINUTES = 30
 DEFAULT_TEST_DATABASE_URL = "postgresql+psycopg://porteria:porteria@127.0.0.1:5432/porteria_test"
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 
@@ -92,11 +101,84 @@ def db_session(migrated_engine: Engine) -> Iterator[Session]:
             transaction.rollback()
 
 
+@pytest.fixture(scope="session")
+def fast_passwords() -> Passwords:
+    """Argon2id con parámetros mínimos: cada hash tarda microsegundos en vez de ~50 ms."""
+    return Passwords(PasswordHash((Argon2Hasher(time_cost=1, memory_cost=8, parallelism=1),)))
+
+
 @pytest.fixture
-def client(migrated_engine: Engine, db_session: Session) -> Iterator[TestClient]:
+def client(
+    migrated_engine: Engine, db_session: Session, fast_passwords: Passwords
+) -> Iterator[TestClient]:
     """Cliente HTTP cuya sesión por petición es `db_session`."""
     url = migrated_engine.url.render_as_string(hide_password=False)
-    app = create_app(Settings(database_url=url, jwt_secret=TEST_JWT_SECRET))
+    settings = Settings(
+        database_url=url, jwt_secret=TEST_JWT_SECRET, access_token_minutes=TEST_TOKEN_MINUTES
+    )
+    app = create_app(settings, passwords=fast_passwords)
     app.dependency_overrides[get_session] = lambda: db_session
     with TestClient(app) as test_client:
         yield test_client
+
+
+class MakeUser(Protocol):
+    def __call__(
+        self,
+        role: UserRole = UserRole.GUARD,
+        *,
+        username: str | None = None,
+        password: str = TEST_PASSWORD,
+        status: UserStatus = UserStatus.ACTIVE,
+        resident: Resident | None = None,
+    ) -> User: ...
+
+
+@pytest.fixture
+def make_user(db_session: Session, fast_passwords: Passwords) -> MakeUser:
+    """Crea usuarios guardados (flush); un `resident` sin residente recibe uno nuevo."""
+    numbers = itertools.count(1)
+
+    def make(
+        role: UserRole = UserRole.GUARD,
+        *,
+        username: str | None = None,
+        password: str = TEST_PASSWORD,
+        status: UserStatus = UserStatus.ACTIVE,
+        resident: Resident | None = None,
+    ) -> User:
+        n = next(numbers)
+        if role is UserRole.RESIDENT and resident is None:
+            tower = Tower(name=f"Torre de pruebas {n}")
+            db_session.add(tower)
+            db_session.flush()
+            unit = Unit(tower_id=tower.id, number=str(n))
+            db_session.add(unit)
+            db_session.flush()
+            resident = Resident(unit_id=unit.id, full_name=f"Residente {n}")
+        user = User(
+            username=username or f"{role.value}{n}",
+            password_hash=fast_passwords.hash(password),
+            full_name=f"Usuario {n}",
+            role=role,
+            status=status,
+            resident=resident,
+        )
+        db_session.add(user)
+        db_session.flush()
+        return user
+
+    return make
+
+
+def auth_headers(user: User, *, now: datetime | None = None) -> dict[str, str]:
+    """Cabecera `Authorization` con un token para la `token_version` actual de `user`."""
+    token = encode_access_token(
+        user.id,
+        user.token_version,
+        secret=TEST_JWT_SECRET,
+        algorithm="HS256",
+        minutes=TEST_TOKEN_MINUTES,
+        now=now or datetime.now(UTC),
+    )
+    return {"Authorization": f"Bearer {token}"}

@@ -13,9 +13,11 @@ from porteria_api import __version__
 from porteria_api.config import Settings
 from porteria_api.db import create_db_engine
 from porteria_api.routes import health
+from porteria_api.security import Passwords
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, passwords: Passwords | None = None) -> FastAPI:
+    """`passwords` existe para que las pruebas inyecten un Argon2 barato."""
     resolved = settings or Settings()
 
     @asynccontextmanager
@@ -29,5 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
 
     app = FastAPI(title="Portería API", version=__version__, lifespan=lifespan)
+    app.state.settings = resolved
+    app.state.passwords = passwords or Passwords()
     app.include_router(health.router)
     return app
