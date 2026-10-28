@@ -18,6 +18,7 @@ services/api/
 │   ├── config.py           # DatabaseSettings y Settings: variables de entorno
 │   ├── security.py         # hash de contraseñas (Argon2id) y tokens de acceso (JWT)
 │   ├── audit.py            # record_audit() y snapshot(): escribir en la bitácora de auditoría
+│   ├── auth.py             # CurrentUser y require_roles(): quién pide y si su rol puede pasar
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
@@ -40,6 +41,7 @@ Auditoría: cada fila de `audit_logs` dice quién (`actor_user_id`, `NULL` si no
 
 - `create_app()` no se conecta a la base: el motor se crea al arrancar (lifespan) y se libera al apagar. Así importar el módulo o correr pruebas no necesita PostgreSQL.
 - Cada petición recibe su propia sesión (`SessionDep`) y se cierra al terminar.
+- Una ruta protegida pide `CurrentUser` (cualquier rol) o `AdminUser` (`require_roles(UserRole.ADMIN)`). El usuario se recarga de la base en cada petición: sin token, con token vencido o inválido, con `token_version` vieja, deshabilitado o con su residente inactivo responde `401` con `WWW-Authenticate: Bearer`; con un rol no permitido, `403`.
 - `/health` hace `SELECT 1`: responde `200 {"status": "ok", "database": "ok"}` o, si la base no contesta, `503 {"status": "error", "database": "unavailable"}`. El detalle del error va al log, no al cliente.
 
 ## Configuración
