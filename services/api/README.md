@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`).
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`) y bitácora de auditoría (revisión `0006`).
 
 ## Estructura
 
@@ -24,6 +24,7 @@ services/api/
 │   ├── models/site.py      # torres, unidades, porterías, carriles, cámaras, talanqueras
 │   ├── models/people.py    # residentes, vehículos y visitantes
 │   ├── models/users.py     # usuarios de la API con su rol
+│   ├── models/audit.py     # bitácora de auditoría (solo se agregan filas)
 │   └── routes/health.py    # GET /health
 └── tests/
 ```
@@ -33,6 +34,8 @@ Topología: una torre tiene unidades (el número no se repite dentro de la torre
 Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (llegan a una unidad en cada visita). La placa se guarda normalizada con `normalize_plate` de [`lr-contracts`](../../packages/contracts/README.md) (`abc 123` queda `ABC123`), igual que en cada `PlateRead`, y un `CHECK` rechaza lo que no sea `^[A-Z0-9]{3,10}$`. `plate_kind` no se escribe a mano: sale de `classify_plate` al asignar la placa, y el `CHECK` `ck_vehicles_plate_kind_matches_plate` rechaza un tipo que contradiga la placa (por ejemplo `ABC123` como `motorcycle`), aunque llegue por SQL directo. Un índice único parcial (`WHERE status <> 'inactive'`) impide que dos vehículos vigentes (`active` o `blocked`) tengan la misma placa, pero deja guardar como historia los vehículos dados de baja (`inactive`). El documento del visitante es único por tipo: `cc 123` y `ce 123` son personas distintas.
 
 Usuarios: cada uno tiene un solo rol (`admin`, `guard` o `resident`). El nombre de usuario se guarda en minúsculas (`Ana` queda `ana`) y es único; un `CHECK` rechaza mayúsculas aunque lleguen por SQL directo. Solo el rol `resident` apunta a un residente, y cada residente tiene a lo sumo un usuario (`ck_users_resident_link`, `uq_users_resident_id`). `token_version` va dentro de cada token: subirlo deja sin validez los tokens ya emitidos.
+
+Auditoría: cada fila de `audit_logs` dice quién (`actor_user_id`, `NULL` si no fue un usuario), qué acción (`user.created`; el `CHECK` exige el formato `entidad.verbo`), sobre qué entidad y la foto de antes y de después en JSON. Solo se agregan filas: un trigger de PostgreSQL rechaza `UPDATE`, `DELETE` y `TRUNCATE` aunque lleguen por SQL directo, y por eso la tabla no tiene `updated_at`.
 
 - `create_app()` no se conecta a la base: el motor se crea al arrancar (lifespan) y se libera al apagar. Así importar el módulo o correr pruebas no necesita PostgreSQL.
 - Cada petición recibe su propia sesión (`SessionDep`) y se cierra al terminar.
@@ -116,6 +119,10 @@ El código usa nombres en inglés; esta es la equivalencia con el lenguaje del p
 | usuario (activo o deshabilitado) | user (status `active` / `disabled`) |
 | rol (administrador, guarda, residente) | role (`admin` / `guard` / `resident`) |
 | versión del token (sube para invalidar tokens emitidos) | token_version |
+| bitácora de auditoría (solo agregar) | audit log (append-only) |
+| acción auditada (`entidad.verbo`) | audit action (`user.created`) |
+| foto de antes / de después | before / after snapshot |
+| disparador (trigger) | trigger |
 | índice único parcial | partial unique index |
 | chequeo de salud | health check |
 | ciclo de vida de la app | lifespan |

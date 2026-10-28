@@ -3,6 +3,7 @@
 Alembic compara contra `Base.metadata`: todo modelo nuevo se importa aquí para que lo vea.
 """
 
+from porteria_api.models.audit import AuditLog
 from porteria_api.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from porteria_api.models.enums import (
     CameraKind,
@@ -18,6 +19,7 @@ from porteria_api.models.site import Camera, Gate, Gatehouse, Lane, Tower, Unit
 from porteria_api.models.users import User
 
 __all__ = [
+    "AuditLog",
     "Base",
     "Camera",
     "CameraKind",
