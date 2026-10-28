@@ -53,6 +53,14 @@ class UserStatus(enum.StrEnum):
     DISABLED = "disabled"
 
 
+class AuditAction(enum.StrEnum):
+    """`entidad.verbo`. La base solo revisa el formato: una acción nueva no necesita migración."""
+
+    USER_CREATED = "user.created"
+    USER_UPDATED = "user.updated"
+    USER_PASSWORD_RESET = "user.password_reset"  # noqa: S105
+
+
 def _values(enum_cls: type[enum.Enum]) -> list[str]:
     return [str(member.value) for member in enum_cls]
 

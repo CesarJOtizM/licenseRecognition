@@ -1,4 +1,4 @@
-"""Bitácora de auditoría: formato de la acción, actor y filas que no se pueden cambiar."""
+"""Bitácora de auditoría: filas que no se pueden cambiar y escritura en la misma transacción."""
 
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -8,6 +8,8 @@ import psycopg
 import pytest
 from alembic import command
 from alembic.config import Config
+from porteria_api.audit import USER_AUDIT_FIELDS, record_audit, snapshot
+from porteria_api.models import AuditAction, User, UserRole
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.orm import Session
@@ -15,6 +17,7 @@ from uuid_utils.compat import uuid7
 
 pytestmark = pytest.mark.db
 
+FAKE_HASH = "no-es-un-hash-real"
 INSERT_LOG = (
     "INSERT INTO audit_logs (id, actor_user_id, action, entity_type)"
     " VALUES (:id, :actor_user_id, :action, 'user')"
@@ -115,3 +118,88 @@ def test_bajar_a_0005_borra_la_funcion_del_trigger(
         assert not _function_exists(db_engine)
     finally:
         command.upgrade(alembic_config, "head")
+
+
+@pytest.fixture
+def admin(db_session: Session) -> User:
+    user = User(username="admin", password_hash=FAKE_HASH, full_name="Admin", role=UserRole.ADMIN)
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _count(session: Session) -> int:
+    return session.scalar(text("SELECT count(*) FROM audit_logs")) or 0
+
+
+def test_record_audit_guarda_actor_accion_y_foto_sin_secretos(
+    db_session: Session, admin: User
+) -> None:
+    log = record_audit(
+        db_session,
+        actor=admin,
+        action=AuditAction.USER_CREATED,
+        entity_type="user",
+        entity_id=admin.id,
+        after=snapshot(admin, USER_AUDIT_FIELDS),
+    )
+    db_session.flush()
+
+    stored = db_session.execute(
+        text(
+            "SELECT actor_user_id, action, entity_type, entity_id, before, after,"
+            " occurred_at = now() FROM audit_logs WHERE id = :id"
+        ),
+        {"id": log.id},
+    ).one()
+
+    assert tuple(stored) == (
+        admin.id,
+        "user.created",
+        "user",
+        admin.id,
+        None,
+        {
+            "username": "admin",
+            "full_name": "Admin",
+            "role": "admin",
+            "status": "active",
+            "resident_id": None,
+        },
+        True,
+    )
+
+
+def test_record_audit_sin_actor_deja_el_actor_en_null(db_session: Session, admin: User) -> None:
+    log = record_audit(
+        db_session,
+        actor=None,
+        action=AuditAction.USER_PASSWORD_RESET,
+        entity_type="user",
+        entity_id=admin.id,
+    )
+    db_session.flush()
+
+    stored = db_session.execute(
+        text("SELECT actor_user_id, action, before, after FROM audit_logs WHERE id = :id"),
+        {"id": log.id},
+    ).one()
+
+    assert tuple(stored) == (None, "user.password_reset", None, None)
+
+
+def test_record_audit_se_deshace_con_la_transaccion(db_session: Session, admin: User) -> None:
+    savepoint = db_session.begin_nested()
+    record_audit(
+        db_session,
+        actor=admin,
+        action=AuditAction.USER_UPDATED,
+        entity_type="user",
+        entity_id=admin.id,
+    )
+    db_session.flush()
+    assert _count(db_session) == 1
+
+    savepoint.rollback()
+
+    assert _count(db_session) == 0
