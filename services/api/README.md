@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`) y bitácora de auditoría (revisión `0006`).
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`) e inicio de sesión (`/auth/login`, `/auth/me`).
 
 ## Estructura
 
@@ -19,6 +19,7 @@ services/api/
 │   ├── security.py         # hash de contraseñas (Argon2id) y tokens de acceso (JWT)
 │   ├── audit.py            # record_audit() y snapshot(): escribir en la bitácora de auditoría
 │   ├── auth.py             # CurrentUser y require_roles(): quién pide y si su rol puede pasar
+│   ├── schemas.py          # cuerpos de petición y respuesta (Pydantic)
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
@@ -27,7 +28,8 @@ services/api/
 │   ├── models/people.py    # residentes, vehículos y visitantes
 │   ├── models/users.py     # usuarios de la API con su rol
 │   ├── models/audit.py     # bitácora de auditoría (solo se agregan filas)
-│   └── routes/health.py    # GET /health
+│   ├── routes/health.py    # GET /health
+│   └── routes/auth.py      # POST /auth/login y GET /auth/me
 └── tests/
 ```
 
@@ -66,6 +68,18 @@ curl http://127.0.0.1:8000/health      # documentación interactiva en /docs
 ```
 
 `--factory` le dice a uvicorn que `create_app` es una función que devuelve la app, no la app misma.
+
+### Iniciar sesión
+
+`POST /auth/login` recibe un formulario (`username`, `password`) y devuelve `{"access_token": "...", "token_type": "bearer", "expires_in": 1800}`. El usuario no distingue mayúsculas (`ANA` entra como `ana`). Contraseña incorrecta, usuario inexistente, deshabilitado o residente inactivo responden el mismo `401 {"detail": "Incorrect username or password"}`; el motivo solo queda en el log, sin la contraseña. El login no escribe en la bitácora de auditoría.
+
+```powershell
+$login = Invoke-RestMethod -Method Post http://127.0.0.1:8000/auth/login -Body @{ username = "ana"; password = "una-contrasena-larga" }
+Invoke-RestMethod http://127.0.0.1:8000/auth/me -Headers @{ Authorization = "Bearer $($login.access_token)" }
+# con curl: curl -d "username=ana&password=una-contrasena-larga" http://127.0.0.1:8000/auth/login
+```
+
+`GET /auth/me` devuelve `id`, `username`, `role`, `resident_id` y `unit_id` (los dos últimos `null` si no es residente). En `/docs`, el botón **Authorize** pide usuario y contraseña, llama a `/auth/login` y envía el token en las demás peticiones.
 
 ## Migraciones
 
