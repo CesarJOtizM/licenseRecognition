@@ -9,10 +9,13 @@ from porteria_api.models.enums import (
     DocumentType,
     LaneDirection,
     ResidentStatus,
+    UserRole,
+    UserStatus,
     VehicleStatus,
 )
 from porteria_api.models.people import Resident, Vehicle, Visitor
 from porteria_api.models.site import Camera, Gate, Gatehouse, Lane, Tower, Unit
+from porteria_api.models.users import User
 
 __all__ = [
     "Base",
@@ -29,6 +32,9 @@ __all__ = [
     "Tower",
     "UUIDPrimaryKeyMixin",
     "Unit",
+    "User",
+    "UserRole",
+    "UserStatus",
     "Vehicle",
     "VehicleStatus",
     "Visitor",
