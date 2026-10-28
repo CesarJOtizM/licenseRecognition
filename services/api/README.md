@@ -17,6 +17,7 @@ services/api/
 ├── src/porteria_api/
 │   ├── config.py           # DatabaseSettings y Settings: variables de entorno
 │   ├── security.py         # hash de contraseñas (Argon2id) y tokens de acceso (JWT)
+│   ├── audit.py            # record_audit() y snapshot(): escribir en la bitácora de auditoría
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
@@ -35,7 +36,7 @@ Personas: residentes y vehículos pertenecen a una unidad; los visitantes no (ll
 
 Usuarios: cada uno tiene un solo rol (`admin`, `guard` o `resident`). El nombre de usuario se guarda en minúsculas (`Ana` queda `ana`) y es único; un `CHECK` rechaza mayúsculas aunque lleguen por SQL directo. Solo el rol `resident` apunta a un residente, y cada residente tiene a lo sumo un usuario (`ck_users_resident_link`, `uq_users_resident_id`). `token_version` va dentro de cada token: subirlo deja sin validez los tokens ya emitidos.
 
-Auditoría: cada fila de `audit_logs` dice quién (`actor_user_id`, `NULL` si no fue un usuario), qué acción (`user.created`; el `CHECK` exige el formato `entidad.verbo`), sobre qué entidad y la foto de antes y de después en JSON. Solo se agregan filas: un trigger de PostgreSQL rechaza `UPDATE`, `DELETE` y `TRUNCATE` aunque lleguen por SQL directo, y por eso la tabla no tiene `updated_at`.
+Auditoría: cada fila de `audit_logs` dice quién (`actor_user_id`, `NULL` si no fue un usuario), qué acción (`user.created`; el `CHECK` exige el formato `entidad.verbo`), sobre qué entidad y la foto de antes y de después en JSON. Solo se agregan filas: un trigger de PostgreSQL rechaza `UPDATE`, `DELETE` y `TRUNCATE` aunque lleguen por SQL directo, y por eso la tabla no tiene `updated_at`. `record_audit()` agrega la fila en la misma transacción del cambio: si el cambio se deshace, la fila también. Las fotos salen de `snapshot()` con una lista de campos permitidos (`USER_AUDIT_FIELDS`); `password_hash` nunca entra.
 
 - `create_app()` no se conecta a la base: el motor se crea al arrancar (lifespan) y se libera al apagar. Así importar el módulo o correr pruebas no necesita PostgreSQL.
 - Cada petición recibe su propia sesión (`SessionDep`) y se cierra al terminar.
