@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from porteria_api import __version__
 from porteria_api.config import Settings
 from porteria_api.db import create_db_engine
-from porteria_api.routes import health
+from porteria_api.routes import auth, health
 from porteria_api.security import Passwords
 
 
@@ -34,4 +34,5 @@ def create_app(settings: Settings | None = None, passwords: Passwords | None = N
     app.state.settings = resolved
     app.state.passwords = passwords or Passwords()
     app.include_router(health.router)
+    app.include_router(auth.router)
     return app
