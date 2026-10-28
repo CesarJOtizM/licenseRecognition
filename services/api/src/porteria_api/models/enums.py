@@ -40,6 +40,19 @@ class DocumentType(enum.StrEnum):
     OTHER = "other"
 
 
+class UserRole(enum.StrEnum):
+    """Un rol por usuario. `resident` es el único que va ligado a un residente."""
+
+    ADMIN = "admin"
+    GUARD = "guard"
+    RESIDENT = "resident"
+
+
+class UserStatus(enum.StrEnum):
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
 def _values(enum_cls: type[enum.Enum]) -> list[str]:
     return [str(member.value) for member in enum_cls]
 
