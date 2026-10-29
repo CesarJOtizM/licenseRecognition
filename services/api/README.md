@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`) e inicio de sesión (`/auth/login`, `/auth/me`).
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`), inicio de sesión (`/auth/login`, `/auth/me`) y alta y listado de usuarios (`POST/GET /users`).
 
 ## Estructura
 
@@ -29,7 +29,8 @@ services/api/
 │   ├── models/users.py     # usuarios de la API con su rol
 │   ├── models/audit.py     # bitácora de auditoría (solo se agregan filas)
 │   ├── routes/health.py    # GET /health
-│   └── routes/auth.py      # POST /auth/login y GET /auth/me
+│   ├── routes/auth.py      # POST /auth/login y GET /auth/me
+│   └── routes/users.py     # POST y GET /users (solo administradores)
 └── tests/
 ```
 
@@ -80,6 +81,16 @@ Invoke-RestMethod http://127.0.0.1:8000/auth/me -Headers @{ Authorization = "Bea
 ```
 
 `GET /auth/me` devuelve `id`, `username`, `role`, `resident_id` y `unit_id` (los dos últimos `null` si no es residente). En `/docs`, el botón **Authorize** pide usuario y contraseña, llama a `/auth/login` y envía el token en las demás peticiones.
+
+### Usuarios
+
+Solo un `admin` usa `/users` (sin token: `401`; guarda o residente: `403`). `POST /users` recibe JSON `{"username", "password", "full_name", "role", "resident_id"}` y responde `201` con el usuario, sin `password_hash` ni `token_version`. La contraseña tiene de 12 a 128 caracteres; `resident_id` es obligatorio para `resident` y prohibido para los demás. Usuario repetido (sin distinguir mayúsculas) o residente que ya tiene usuario: `409`; residente inexistente: `422`. Cada alta escribe una fila `user.created` en la auditoría con el administrador como actor; si falla, no queda ninguna. `GET /users` lista todos ordenados por `username`. No se borran usuarios (`DELETE` responde `405`).
+
+```powershell
+$admin = @{ Authorization = "Bearer $($login.access_token)" }
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/users -Headers $admin -ContentType application/json -Body '{"username": "bob", "password": "una-contrasena-larga", "full_name": "Bob", "role": "guard"}'
+Invoke-RestMethod http://127.0.0.1:8000/users -Headers $admin
+```
 
 ## Migraciones
 
