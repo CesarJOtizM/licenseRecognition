@@ -56,6 +56,30 @@ class UserCreate(BaseModel):
         return self
 
 
+class UserUpdate(BaseModel):
+    """Solo cambian los campos enviados; `resident_id: null` explícito desliga al residente."""
+
+    full_name: FullName | None = None
+    role: UserRole | None = None
+    status: UserStatus | None = None
+    resident_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> Self:
+        nulls = sorted(
+            field
+            for field in self.model_fields_set - {"resident_id"}
+            if getattr(self, field) is None
+        )
+        if nulls:
+            raise ValueError(f"cannot be null: {', '.join(nulls)}")
+        return self
+
+
+class PasswordReset(BaseModel):
+    new_password: Password
+
+
 class UserRead(BaseModel):
     """Sin `password_hash` ni `token_version`: nunca salen de la API."""
 

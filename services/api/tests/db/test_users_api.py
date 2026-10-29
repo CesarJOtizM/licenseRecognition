@@ -1,11 +1,11 @@
-"""POST y GET /users: solo administradores, sin secretos en la respuesta y con auditoría."""
+"""/users: solo administradores, sin secretos en la respuesta y con auditoría."""
 
 import uuid
 
 import pytest
-from conftest import MakeUser, auth_headers
+from conftest import TEST_PASSWORD, MakeUser, auth_headers
 from fastapi.testclient import TestClient
-from porteria_api.models import AuditLog, Resident, Tower, Unit, User, UserRole
+from porteria_api.models import AuditLog, Resident, Tower, Unit, User, UserRole, UserStatus
 from porteria_api.routes.users import http_error_for
 from porteria_api.security import Passwords
 from sqlalchemy import func, select
@@ -219,8 +219,13 @@ def test_guarda_y_residente_reciben_403(
     assert _count(db_session, User) == users_before
 
 
-def test_no_se_borran_usuarios(client: TestClient, admin_headers: dict[str, str]) -> None:
+def test_no_se_borran_usuarios(
+    client: TestClient, make_user: MakeUser, admin_headers: dict[str, str]
+) -> None:
+    target = make_user()
+
     assert client.delete("/users", headers=admin_headers).status_code == 405
+    assert client.delete(f"/users/{target.id}", headers=admin_headers).status_code == 405
 
 
 def test_una_restriccion_sin_traduccion_no_se_convierte_en_respuesta(
@@ -232,3 +237,197 @@ def test_una_restriccion_sin_traduccion_no_se_convierte_en_respuesta(
         db_session.flush()
 
     assert http_error_for(exc_info.value) is None
+
+
+def _logs(session: Session, user: User) -> list[AuditLog]:
+    return list(session.scalars(select(AuditLog).where(AuditLog.entity_id == user.id)))
+
+
+def test_deshabilitar_corta_el_acceso_y_reactivar_no_revive_el_token(
+    client: TestClient, make_user: MakeUser, admin_headers: dict[str, str]
+) -> None:
+    guard = make_user()
+    old_token = auth_headers(guard)
+
+    response = client.patch(
+        f"/users/{guard.id}", json={"status": "disabled"}, headers=admin_headers
+    )
+    assert response.status_code == 200, response.text
+    assert set(response.json()) == USER_FIELDS
+    assert response.json()["status"] == "disabled"
+    assert client.get("/auth/me", headers=old_token).status_code == 401
+    client.patch(f"/users/{guard.id}", json={"status": "active"}, headers=admin_headers)
+    assert client.get("/auth/me", headers=old_token).status_code == 401
+    assert client.get("/auth/me", headers=auth_headers(guard)).status_code == 200
+
+
+def test_cambiar_el_rol_deja_una_fila_con_antes_y_despues(
+    client: TestClient, make_user: MakeUser, db_session: Session
+) -> None:
+    admin = make_user(UserRole.ADMIN, username="admin")
+    guard = make_user(username="bob")
+
+    response = client.patch(
+        f"/users/{guard.id}", json={"role": "admin"}, headers=auth_headers(admin)
+    )
+
+    assert response.status_code == 200, response.text
+    [log] = _logs(db_session, guard)
+    assert (log.action, log.actor_user_id) == ("user.updated", admin.id)
+    assert (log.before or {}).get("role") == "guard"
+    assert log.after == {**(log.before or {}), "role": "admin"}
+
+
+def test_guarda_a_residente_y_de_vuelta_con_null_explicito(
+    client: TestClient, make_user: MakeUser, admin_headers: dict[str, str], db_session: Session
+) -> None:
+    guard, resident = make_user(), _free_resident(db_session)
+    to_resident = {"role": "resident", "resident_id": str(resident.id)}
+
+    first = client.patch(f"/users/{guard.id}", json=to_resident, headers=admin_headers)
+    back = client.patch(
+        f"/users/{guard.id}", json={"role": "guard", "resident_id": None}, headers=admin_headers
+    )
+
+    assert first.json()["resident_id"] == str(resident.id), first.text
+    assert (back.json()["role"], back.json()["resident_id"]) == ("guard", None), back.text
+
+
+@pytest.mark.parametrize(
+    ("changes", "expected"),
+    [
+        pytest.param({"role": "resident"}, 422, id="residente-sin-residente"),
+        pytest.param(
+            {"role": "resident", "resident_id": str(uuid.uuid4())}, 422, id="residente-inexistente"
+        ),
+        pytest.param({"role": "resident", "resident_id": "taken"}, 409, id="residente-ocupado"),
+        pytest.param({"full_name": None}, 422, id="nombre-null"),
+        pytest.param({"status": "borrado"}, 422, id="estado-desconocido"),
+    ],
+)
+def test_un_patch_rechazado_no_cambia_nada_ni_audita(
+    client: TestClient,
+    make_user: MakeUser,
+    admin_headers: dict[str, str],
+    db_session: Session,
+    changes: dict[str, object],
+    expected: int,
+) -> None:
+    guard = make_user()
+    if changes.get("resident_id") == "taken":
+        changes["resident_id"] = str(make_user(UserRole.RESIDENT).resident_id)
+    full_name, audit_before = guard.full_name, _count(db_session, AuditLog)
+
+    response = client.patch(f"/users/{guard.id}", json=changes, headers=admin_headers)
+
+    assert response.status_code == expected, response.text
+    db_session.refresh(guard)
+    assert (guard.role, guard.resident_id, guard.full_name) == (UserRole.GUARD, None, full_name)
+    assert _count(db_session, AuditLog) == audit_before
+
+
+@pytest.mark.parametrize(
+    ("method", "suffix", "body"),
+    [("PATCH", "", {"full_name": "Nadie"}), ("POST", "/password", {"new_password": NEW_PASSWORD})],
+)
+def test_un_usuario_inexistente_responde_404(
+    client: TestClient, admin_headers: dict[str, str], method: str, suffix: str, body: object
+) -> None:
+    response = client.request(
+        method, f"/users/{uuid.uuid4()}{suffix}", json=body, headers=admin_headers
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "User not found"}
+
+
+@pytest.mark.parametrize("changes", [{"status": "disabled"}, {"role": "guard"}])
+def test_el_admin_no_se_deshabilita_ni_se_quita_el_rol(
+    client: TestClient, make_user: MakeUser, db_session: Session, changes: dict[str, str]
+) -> None:
+    admin = make_user(UserRole.ADMIN, username="admin")
+
+    response = client.patch(f"/users/{admin.id}", json=changes, headers=auth_headers(admin))
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "You cannot disable or demote your own account"}
+    db_session.refresh(admin)
+    assert (admin.role, admin.status) == (UserRole.ADMIN, UserStatus.ACTIVE)
+    assert _logs(db_session, admin) == []
+
+
+def test_el_admin_si_cambia_su_propio_nombre(
+    client: TestClient, make_user: MakeUser, db_session: Session
+) -> None:
+    admin = make_user(UserRole.ADMIN, username="admin")
+
+    response = client.patch(
+        f"/users/{admin.id}",
+        json={"full_name": "Ana Admin", "role": "admin", "status": "active"},
+        headers=auth_headers(admin),
+    )
+
+    assert response.status_code == 200, response.text
+    [log] = _logs(db_session, admin)
+    assert log.after == {**(log.before or {}), "full_name": "Ana Admin"}
+
+
+@pytest.mark.parametrize("changes", [{}, {"full_name": "Bob", "role": "guard", "status": "active"}])
+def test_un_patch_sin_cambios_no_audita(
+    client: TestClient,
+    make_user: MakeUser,
+    admin_headers: dict[str, str],
+    db_session: Session,
+    changes: dict[str, str],
+) -> None:
+    guard = make_user()
+    guard.full_name = "Bob"
+    db_session.flush()
+
+    response = client.patch(f"/users/{guard.id}", json=changes, headers=admin_headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["full_name"] == "Bob"
+    assert _logs(db_session, guard) == []
+
+
+def test_cambiar_la_contrasena_invalida_tokens_y_audita_sin_secretos(
+    client: TestClient, make_user: MakeUser, db_session: Session
+) -> None:
+    admin = make_user(UserRole.ADMIN, username="admin")
+    guard = make_user(username="bob")
+    old_token = auth_headers(guard)
+
+    response = client.post(
+        f"/users/{guard.id}/password",
+        json={"new_password": NEW_PASSWORD},
+        headers=auth_headers(admin),
+    )
+
+    assert response.status_code == 204, response.text
+    assert response.content == b""
+    db_session.refresh(guard)
+    assert guard.token_version == 1
+    assert client.get("/auth/me", headers=old_token).status_code == 401
+    old_login = client.post("/auth/login", data={"username": "bob", "password": TEST_PASSWORD})
+    assert old_login.status_code == 401
+    new_login = client.post("/auth/login", data={"username": "bob", "password": NEW_PASSWORD})
+    assert new_login.status_code == 200
+    [log] = _logs(db_session, guard)
+    assert (log.action, log.actor_user_id) == ("user.password_reset", admin.id)
+    assert (log.before, log.after) == (None, None)
+
+
+def test_una_contrasena_corta_no_cambia_nada(
+    client: TestClient, make_user: MakeUser, admin_headers: dict[str, str], db_session: Session
+) -> None:
+    guard = make_user()
+
+    response = client.post(
+        f"/users/{guard.id}/password", json={"new_password": "corta"}, headers=admin_headers
+    )
+
+    assert response.status_code == 422
+    db_session.refresh(guard)
+    assert guard.token_version == 0
+    assert _logs(db_session, guard) == []

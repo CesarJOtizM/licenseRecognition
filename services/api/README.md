@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`), inicio de sesión (`/auth/login`, `/auth/me`) y alta y listado de usuarios (`POST/GET /users`).
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`), inicio de sesión (`/auth/login`, `/auth/me`) y gestión de usuarios (`POST/GET /users`, `PATCH /users/{id}`, `POST /users/{id}/password`).
 
 ## Estructura
 
@@ -30,7 +30,7 @@ services/api/
 │   ├── models/audit.py     # bitácora de auditoría (solo se agregan filas)
 │   ├── routes/health.py    # GET /health
 │   ├── routes/auth.py      # POST /auth/login y GET /auth/me
-│   └── routes/users.py     # POST y GET /users (solo administradores)
+│   └── routes/users.py     # alta, listado, edición y contraseña de usuarios (solo administradores)
 └── tests/
 ```
 
@@ -86,10 +86,15 @@ Invoke-RestMethod http://127.0.0.1:8000/auth/me -Headers @{ Authorization = "Bea
 
 Solo un `admin` usa `/users` (sin token: `401`; guarda o residente: `403`). `POST /users` recibe JSON `{"username", "password", "full_name", "role", "resident_id"}` y responde `201` con el usuario, sin `password_hash` ni `token_version`. La contraseña tiene de 12 a 128 caracteres; `resident_id` es obligatorio para `resident` y prohibido para los demás. Usuario repetido (sin distinguir mayúsculas) o residente que ya tiene usuario: `409`; residente inexistente: `422`. Cada alta escribe una fila `user.created` en la auditoría con el administrador como actor; si falla, no queda ninguna. `GET /users` lista todos ordenados por `username`. No se borran usuarios (`DELETE` responde `405`).
 
+`PATCH /users/{id}` cambia solo lo que se envía de `full_name`, `role`, `status` (`active`/`disabled`) y `resident_id` (`null` explícito lo quita); usuario inexistente: `404`; mismas reglas `409`/`422` que el alta. Un admin no puede deshabilitarse ni quitarse el rol (`409`), pero sí cambiar su nombre. Deshabilitar corta el acceso al instante y sube `token_version`, así que al reactivar los tokens viejos siguen sin servir. Cada cambio real escribe `user.updated` con `before`/`after`; un `PATCH` sin cambios no audita. `POST /users/{id}/password` con `{"new_password"}` responde `204`, sube `token_version` (los tokens del usuario dejan de servir) y audita `user.password_reset` sin datos de la contraseña.
+
 ```powershell
 $admin = @{ Authorization = "Bearer $($login.access_token)" }
 Invoke-RestMethod -Method Post http://127.0.0.1:8000/users -Headers $admin -ContentType application/json -Body '{"username": "bob", "password": "una-contrasena-larga", "full_name": "Bob", "role": "guard"}'
 Invoke-RestMethod http://127.0.0.1:8000/users -Headers $admin
+$bob = (Invoke-RestMethod http://127.0.0.1:8000/users -Headers $admin | Where-Object username -eq bob).id
+Invoke-RestMethod -Method Patch http://127.0.0.1:8000/users/$bob -Headers $admin -ContentType application/json -Body '{"status": "disabled"}'
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/users/$bob/password -Headers $admin -ContentType application/json -Body '{"new_password": "otra-contrasena-larga"}'
 ```
 
 ## Migraciones
