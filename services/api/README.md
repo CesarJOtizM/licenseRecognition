@@ -4,7 +4,7 @@ Backend en FastAPI. Guarda en PostgreSQL la bitácora, los residentes, los vehí
 
 ## Estado
 
-Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 en curso: tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`), inicio de sesión (`/auth/login`, `/auth/me`) y gestión de usuarios (`POST/GET /users`, `PATCH /users/{id}`, `POST /users/{id}/password`).
+Fase 0, paso 4 (completo): esqueleto ejecutable con `GET /health`, migraciones con Alembic, la topología del conjunto (revisión `0002`: torres, unidades, porterías, carriles, cámaras y talanqueras) y las personas (revisión `0003`: residentes, vehículos y visitantes; `0004`: el tipo de placa no contradice la placa). Paso 5 (completo): tabla de usuarios (revisión `0005`), bitácora de auditoría (revisión `0006`), inicio de sesión (`/auth/login`, `/auth/me`), gestión de usuarios (`POST/GET /users`, `PATCH /users/{id}`, `POST /users/{id}/password`) y el comando `create-admin` para el primer administrador.
 
 ## Estructura
 
@@ -22,6 +22,7 @@ services/api/
 │   ├── schemas.py          # cuerpos de petición y respuesta (Pydantic)
 │   ├── db.py               # motor de SQLAlchemy y sesión por petición
 │   ├── app.py              # create_app(): fábrica de la app y su ciclo de vida
+│   ├── cli.py              # python -m porteria_api.cli create-admin: el primer administrador
 │   ├── models/base.py      # Base, convención de nombres y mixins de id y fechas
 │   ├── models/enums.py     # valores fijos (sentido del carril, estados, tipo de documento...)
 │   ├── models/site.py      # torres, unidades, porterías, carriles, cámaras, talanqueras
@@ -53,22 +54,34 @@ Auditoría: cada fila de `audit_logs` dice quién (`actor_user_id`, `NULL` si no
 |---|---|---|
 | `DATABASE_URL` | `postgresql+psycopg://porteria:porteria@127.0.0.1:5432/porteria` | base de la API (la de `infra/compose.yaml`) |
 | `DB_CONNECT_TIMEOUT` | `3` | segundos máximos para abrir una conexión |
-| `JWT_SECRET` | ninguno (obligatorio para la API) | firma los tokens de acceso; mínimo 32 caracteres. Alembic no lo necesita |
+| `JWT_SECRET` | ninguno (obligatorio para la API) | firma los tokens de acceso; mínimo 32 caracteres. Alembic y `create-admin` no lo necesitan |
 | `JWT_ALGORITHM` | `HS256` | Solo `HS256` |
 | `ACCESS_TOKEN_MINUTES` | `30` | minutos que dura un token de acceso (1 a 1440) |
 
 ## Cómo se ejecuta
 
-Desde la raíz del repositorio, con PostgreSQL levantado ([infra](../../infra/README.md)):
+Primer arranque, desde la raíz del repositorio ([infra](../../infra/README.md) explica PostgreSQL):
 
 ```powershell
-docker compose -f infra/compose.yaml up -d --wait
+docker compose -f infra/compose.yaml up -d --wait              # 1. PostgreSQL
+uv run --directory services/api alembic upgrade head           # 2. crea las tablas
+uv run --directory services/api python -m porteria_api.cli create-admin --username ana --full-name "Ana Pérez"   # 3. primer admin
 $env:JWT_SECRET = python -c "import secrets; print(secrets.token_urlsafe(48))"
-uv run --directory services/api uvicorn porteria_api.app:create_app --factory --reload
+uv run --directory services/api uvicorn porteria_api.app:create_app --factory --reload   # 4. la API
 curl http://127.0.0.1:8000/health      # documentación interactiva en /docs
 ```
 
-`--factory` le dice a uvicorn que `create_app` es una función que devuelve la app, no la app misma.
+Después entra con `ana` (ver [Iniciar sesión](#iniciar-sesión)). En los arranques siguientes bastan el paso 1, el 2 si hay migraciones nuevas, y el 4. `--factory` le dice a uvicorn que `create_app` es una función que devuelve la app, no la app misma. Guarda el `JWT_SECRET`: si cambia, los tokens emitidos dejan de servir.
+
+### Primer administrador
+
+`/users` solo lo usa un admin, así que el primero se crea por consola. `create-admin` pide la contraseña dos veces sin mostrarla (de 12 a 128 caracteres, las mismas reglas de `POST /users`), crea un `admin` activo y escribe `user.created` en la auditoría con actor `NULL` (no lo hizo ningún usuario). Usa `DATABASE_URL`, no `JWT_SECRET`. En un script, `--password-stdin` lee la contraseña de la primera línea de la entrada estándar, sin confirmación:
+
+```powershell
+"una-contrasena-larga" | uv run --directory services/api python -m porteria_api.cli create-admin --username ana --password-stdin
+```
+
+Sale con `0` si lo creó, `1` si la entrada no es válida, las contraseñas no coinciden o el usuario ya existe (no cambia nada), `2` si faltan argumentos y `3` si no se pudo conectar a la base. La contraseña nunca aparece en la salida.
 
 ### Iniciar sesión
 

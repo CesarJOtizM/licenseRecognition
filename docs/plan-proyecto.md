@@ -86,7 +86,7 @@ Por seguridad, nunca se abre automáticamente con coincidencias aproximadas. Esa
   - `Visita`: ingreso y salida emparejados, con su tiempo de permanencia.
 - **Seguridad:** `Usuario` con roles (admin, guarda, residente) y `Auditoria` de las acciones manuales, como aperturas forzadas y ediciones.
 
-Hoy existen Infraestructura y Personas (Fase 0, paso 4; detalle en [services/api](../services/api/README.md)). La placa del vehículo se guarda normalizada como en `PlateRead` y no se repite entre vehículos vigentes; Accesos y Seguridad llegan en las fases siguientes.
+Hoy existen Infraestructura, Personas y Seguridad (Fase 0, pasos 4 y 5; detalle en [services/api](../services/api/README.md)). La placa del vehículo se guarda normalizada como en `PlateRead` y no se repite entre vehículos vigentes. De Seguridad ya están `Usuario` con su rol y la `Auditoria` de la gestión de usuarios; Accesos llega en las fases siguientes.
 
 ## Interfaz web (Next.js)
 
@@ -120,12 +120,12 @@ El objetivo es entender cada pieza, no solo que funcione. Por eso:
 
 ## Fases
 
-1. **Fase 0, base (alrededor de 1 semana):** monorepo, docker-compose, esquema de la base de datos, autenticación y roles, y el contrato `PlateRead`. Se hace en pasos pequeños, cada uno con su commit:
+1. **Fase 0, base (alrededor de 1 semana; completa):** monorepo, docker-compose, esquema de la base de datos, autenticación y roles, y el contrato `PlateRead`. Se hace en pasos pequeños, cada uno con su commit:
    - [x] Paso 1: esqueleto del monorepo, git y convenciones (ADR [0001](decisiones/0001-monorepo.md) y [0002](decisiones/0002-herramientas-uv-pnpm.md)).
    - [x] Paso 2: contrato `PlateRead` con sus pruebas.
    - [x] Paso 3: docker compose con PostgreSQL 18 y Adminer opcional, más la prueba de humo `infra/scripts/smoke.sh` (ADR [0005](decisiones/0005-infraestructura-local-docker-compose.md); requiere Docker Desktop).
    - [x] Paso 4: API FastAPI con el esquema de la base de datos (SQLAlchemy y Alembic; ADR [0006](decisiones/0006-convenciones-base-de-datos.md)).
-   - [ ] Paso 5: autenticación y roles (admin, guarda y residente).
+   - [x] Paso 5: autenticación y roles (admin, guarda y residente), bitácora de auditoría y el comando `create-admin` para el primer administrador (ADR [0007](decisiones/0007-autenticacion-y-roles.md)).
 2. **Fase 1, ANPR (2 a 3 semanas):** primero un prototipo con la webcam (placas impresas o fotos en pantalla, luego vehículos reales) para validar el pipeline de punta a punta. Después, reunir un dataset de placas colombianas, ajustar YOLO, montar el pipeline de OCR y validación, y armar un banco de pruebas con videos grabados. Las metas son al menos 95 % de exactitud por placa de día y menos de 1,5 s de latencia.
 3. **Fase 2, equipo local y decisión (alrededor de 2 semanas):** motor de decisión, `SimulatedGate`, caché local, outbox de sincronización y el adaptador para la cámara LPR.
 4. **Fase 3, portería (alrededor de 2 semanas):** consola del guarda en tiempo real, registro de visitantes y bitácora.
